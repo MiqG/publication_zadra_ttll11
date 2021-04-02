@@ -15,6 +15,7 @@ require(dplyr)
 require(tidyr)
 require(reshape2)
 require(latex2exp)
+require(gtools)
 
 GENE_OI = 'TTLL11'
 ORDER_OI = c('LUSC','UCEC','BRCA','STAD','LUAD','KIRP','THCA','KICH','COAD','LIHC','HNSC','PRAD','KIRC')
@@ -23,9 +24,11 @@ ORDER_OI = c('LUSC','UCEC','BRCA','STAD','LUAD','KIRP','THCA','KICH','COAD','LIH
 ROOT = here::here()
 RESULTS_DIR = file.path(ROOT,'results')
 
-WIDTH = 6.5
+WIDTH = 7.5
 HEIGHT = 4
 BASE_SIZE = 10
+
+N_SAMPLE = 1000
 
 # inputs
 correlations_ca_file = file.path(RESULTS_DIR,'files','correlation-genexpr_centrosome_amplification.tsv')
@@ -35,26 +38,32 @@ correlations_aneuploidy_file = file.path(RESULTS_DIR,'files','correlation-genexp
 fig_dir = file.path(RESULTS_DIR,'figures','correlation_with_scores')
 
 ##### FUNCTIONS ######
-sorted_stripchart = function(df, plt_title, genes_oi=GENE_OI, order_oi=ORDER_OI){
-    ## change group order
-    df = df %>% mutate(cancer_type = factor(cancer_type, levels=order_oi))
-    df = df[order(df$cancer_type),]
-    ## sort and add id
-    df = df %>% drop_na() %>% arrange(cancer_type,sample_type,value)
-    df$id = 1:nrow(df)
-    ## make scatter
-    plt = df %>% ggplot(aes(x=id, y=value)) + geom_point(alpha=0.5, color='darkgray') + geom_point(data=df %>% filter(gene %in% genes_oi), aes(x=id, y=value), color='darkred', size=2) + geom_hline(yintercept = c(-1.96,1.96), linetype='dashed')
-    ## change ticks
-    tick_breaks = df %>% group_by(cancer_type) %>% mutate(tick_breaks=median(id)) %>% distinct(tick_breaks) %>% pull()
-    tick_labels = df %>% distinct(cancer_type) %>% pull()
-    plt = plt + scale_x_continuous(breaks = tick_breaks, labels = tick_labels) 
-    ## make pretty
-    plt = plt + theme_pubr(base_size=BASE_SIZE)
-    plt = plt + ylab('Normalized Spearman Correlation (Z-score)') + xlab('Cancer Type') + ggtitle(plt_title)
+make_plot = function(df, plt_title, gene_oi=GENE_OI, y_lab_pos=-0.6){
+    # plot spearman correlation values as stripchart and violin
+    # highlighting TTLL11 and adding the p-value of the Z-score of 
+    # TTLL11 as labels
     
+    ## prepare pvalues in gene OI
+    stat.test = df %>% filter(gene == GENE_OI) %>% 
+        mutate(
+            p=pvalue, 
+            p.format=format.pval(pvalue,1),
+            p.signif=stars.pval(pvalue),
+            group1=NA,
+            group2=NA)
+
+    ## plot
+    plt = ggstripchart(df, x='cancer_type', y='value', color='darkgrey', alpha=.1) +
+    geom_violin(alpha=0.5) + 
+    geom_boxplot(width=0.1, outlier.shape = NA) + 
+    geom_point(data = df %>% filter(gene == 'TTLL11'), color='darkred', size=2) + 
+    xlab(element_blank()) + ylab(element_blank()) + ggtitle(element_blank()) + 
+    stat_pvalue_manual(stat.test, x = 'cancer_type', y.position = y_lab_pos, label = 'p.signif')
+    plt = ggpar(plt, font.tickslab = c(BASE_SIZE))
     return(plt)
 }
 
+##### Data wrangling ######
 # load data
 correlations_ca = read_tsv(correlations_ca_file)
 correlations_aneuploidy = read_tsv(correlations_aneuploidy_file)
@@ -63,30 +72,53 @@ correlations_aneuploidy = read_tsv(correlations_aneuploidy_file)
 correlations_ca = correlations_ca %>% melt() %>% separate(variable,c('cancer_type','sample_type')) %>% mutate(score_type = 'Centrosome Amplification (CA20)', sample_type = gsub("([a-z])([A-Z])","\\1 \\2", sample_type))
 correlations_aneuploidy = correlations_aneuploidy %>% melt() %>% rename(cancer_type = variable) %>% mutate(sample_type = 'Primary Tumor', score_type = 'Aneuploidy') 
 
+
 # filter
 correlations_ca = correlations_ca %>% filter(cancer_type %in% ORDER_OI)
 correlations_aneuploidy = correlations_aneuploidy %>% filter(cancer_type %in% ORDER_OI)
 
-# plot overall distributions
 plts = list()
-plts[['aneuploidy']] = sorted_stripchart(correlations_aneuploidy %>% group_by(cancer_type) %>% mutate(value=scale(value)), 'Gene Expression and Aneuploidy Score')
-plts[['centrosome_amplification_pt']] = sorted_stripchart(correlations_ca %>% filter(sample_type=='Primary Tumor') %>% mutate(value=scale(value)), 'Gene Expression and Centrosome Amplification Score in PT')
-plts[['centrosome_amplification_stn']] = sorted_stripchart(correlations_ca %>% filter(sample_type=='Solid Tissue Normal') %>% mutate(value=scale(value)), 'Gene Expression and Centrosome Amplification Score in STN')
+
+##### PLOTS ANEUPLOIDY #####
+# init
+df = correlations_aneuploidy
+
+# compute z-scores and pvalues by cancer
+df = df %>% group_by(cancer_type) %>% mutate(z_score=scale(value),pvalue=pnorm(-abs(z_score))) %>% ungroup()
+
+# change group order
+df = df %>% mutate(cancer_type = factor(cancer_type, levels=ORDER_OI))
+df = df[order(df$cancer_type),]
+
+# plot by cancer
+df = df %>% drop_na()
+plt_title = 'Gene Expression and Aneuploidy Score'
+gene_oi = GENE_OI
+plts[['aneuploidy_bycancer']] = make_plot(df, plt_title, gene_oi, -0.7)
+
+# prepare pancancer
+df_pancan = df %>% group_by(gene) %>% summarize(value=median(value)) %>% ungroup() %>% mutate(z_score=as.numeric(scale(value)), pvalue=pnorm(-abs(z_score))) %>% mutate(cancer_type='PANCAN')
+
+# plot pancancer
+plts[['aneuploidy_pancancer']] = make_plot(df_pancan, plt_title, gene_oi, -0.4)
+
+
+##### FIGURES #####
+figs = list()
+
+# aneuploidy
+fig = ggarrange(plts[['aneuploidy_bycancer']], plts[['aneuploidy_pancancer']], ncol=2, widths=c(1.5,0.3))
+fig = annotate_figure(fig,
+                      top = 'Gene Expression and Aneuploidy',
+                      left = text_grob('Spearman Correlation', rot = 90),
+                      bottom = 'Cancer Type')
+figs[['aneuploidy']] = fig
+
 
 # save
-lapply(names(plts), function(plt_name){ 
+lapply(names(figs), function(plt_name){ 
     filename = file.path(fig_dir,paste0(plt_name,'.png'))
-    ggsave(filename, plts[[plt_name]], width = WIDTH, height = HEIGHT, dpi = 100) 
+    ggsave(filename, figs[[plt_name]], width = WIDTH, height = HEIGHT, dpi = 200) 
 })
-
-# summary of TTLL11 across cancers
-df = rbind(correlations_ca, correlations_aneuploidy[,colnames(correlations_ca)])
-plt = df %>% filter(gene == GENE_OI) %>% ggstripchart(x = 'sample_type', y = 'value', color='cancer_type', palette = get_palette('Spectral',length(ORDER_OI))) + facet_wrap(~score_type, scales='free') + ylab('Spearman Correlation') + xlab('Sample Type') + ggtitle(TeX(r'(\textit{TTLL11})')) + labs(color = 'Cancer Type') + theme_pubr(base_size=BASE_SIZE, legend = 'bottom')
-
-#df %>% filter(gene == GENE_OI & score_type=='Centrosome Amplification (CA20)') %>% ggpaired(x = 'sample_type', y = 'value', color='sample_type', line.color = "gray", line.size = 0.4) 
-
-# save
-filename = file.path(fig_dir,'correlations_TTLL11.pdf')
-ggsave(filename, plt, dpi=100, height = HEIGHT, width = WIDTH)
 
 print('Done!')

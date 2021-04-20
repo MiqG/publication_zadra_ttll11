@@ -35,7 +35,8 @@ correlations_ca_file = file.path(RESULTS_DIR,'files','correlation-genexpr_centro
 correlations_aneuploidy_file = file.path(RESULTS_DIR,'files','correlation-genexpr_aneuploidy.tsv') 
 
 # outputs
-fig_dir = file.path(RESULTS_DIR,'figures','correlation_with_scores')
+output_file = file.path(RESULTS_DIR,'figures','correlation_with_scores.rds')
+
 
 ##### FUNCTIONS ######
 make_plot = function(df, plt_title, gene_oi=GENE_OI, y_lab_pos=-0.6){
@@ -53,10 +54,10 @@ make_plot = function(df, plt_title, gene_oi=GENE_OI, y_lab_pos=-0.6){
             group2=NA)
 
     ## plot
-    plt = ggstripchart(df, x='cancer_type', y='value', color='darkgrey', alpha=.1) +
-    geom_violin(alpha=0.5) + 
-    geom_boxplot(width=0.1, outlier.shape = NA) + 
-    geom_point(data = df %>% filter(gene == 'TTLL11'), color='darkred', size=2) + 
+    plt = ggstripchart(df, x='cancer_type', y='value', color='darkgrey', alpha=.1, size=0.5) +
+    geom_violin(alpha=0.5, lwd=0.2) + 
+    geom_boxplot(width=0.1, outlier.shape = NA, lwd=0.1) + 
+    geom_point(data = df %>% filter(gene == 'TTLL11'), color='darkred', size=1) + 
     xlab(element_blank()) + ylab(element_blank()) + ggtitle(element_blank()) + 
     stat_pvalue_manual(stat.test, x = 'cancer_type', y.position = y_lab_pos, label = 'p.signif')
     plt = ggpar(plt, font.tickslab = c(BASE_SIZE))
@@ -102,23 +103,7 @@ df_pancan = df %>% group_by(gene) %>% summarize(value=median(value)) %>% ungroup
 # plot pancancer
 plts[['aneuploidy_pancancer']] = make_plot(df_pancan, plt_title, gene_oi, -0.4)
 
-
-##### FIGURES #####
-figs = list()
-
-# aneuploidy
-fig = ggarrange(plts[['aneuploidy_bycancer']], plts[['aneuploidy_pancancer']], ncol=2, widths=c(1.5,0.3))
-fig = annotate_figure(fig,
-                      top = 'Gene Expression and Aneuploidy',
-                      left = text_grob('Spearman Correlation', rot = 90),
-                      bottom = 'Cancer Type')
-figs[['aneuploidy']] = fig
-
-
 # save
-lapply(names(figs), function(plt_name){ 
-    filename = file.path(fig_dir,paste0(plt_name,'.png'))
-    ggsave(filename, figs[[plt_name]], width = WIDTH, height = HEIGHT, dpi = 200) 
-})
+saveRDS(plts, output_file)
 
 print('Done!')

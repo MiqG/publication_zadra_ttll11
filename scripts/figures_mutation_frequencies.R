@@ -35,7 +35,7 @@ BASE_SIZE = 10
 snv_counts_file = file.path(RESULTS_DIR,'files','snv_gene_freq.tsv')
 
 # outputs
-fig_dir = file.path(RESULTS_DIR,'figures','mutation_frequency')
+output_file = file.path(RESULTS_DIR,'figures','mutation_frequency.rds')
 
 
 ##### FUCNTIONS #####
@@ -61,10 +61,10 @@ make_plot_bycancer = function(df, gene_oi=GENE_OI, y_lab_pos=-5, is_pancan=FALSE
         group2=NA)
 
     ## plot
-    plt = ggstripchart(df, x='cancer_type', y='z_score', color='darkgrey', alpha=.1) +
-    geom_violin(alpha=0.5) + 
-    geom_boxplot(width=0.1, outlier.shape = NA) + 
-    geom_point(data = df %>% filter(gene == 'TTLL11'), color='darkred', size=2) + 
+    plt = ggstripchart(df, x='cancer_type', y='z_score', color='darkgrey', alpha=.1, size=0.5) +
+    geom_violin(alpha=0.5, lwd=0.2) + 
+    geom_boxplot(width=0.1, outlier.shape = NA, lwd=0.1) + 
+    geom_point(data = df %>% filter(gene == 'TTLL11'), color='darkred', size=1) + 
     xlab(element_blank()) + ylab(element_blank()) + ggtitle(element_blank()) + 
     stat_pvalue_manual(stat.test, x = 'cancer_type', y.position = y_lab_pos, label = 'p.signif')
     plt = ggpar(plt, font.tickslab = c(BASE_SIZE))
@@ -106,29 +106,17 @@ for (eff in unique(df$effect)){
     plt_pancancer = make_plot_bycancer(df_pancancer %>% filter(effect==eff), is_pancan = TRUE)
     
     # combine
-    plt = ggarrange(plt_bycancer, plt_pancancer, ncol=2, widths=c(1.5,0.3))
-    plt = annotate_figure(plt,
-                          top = paste('Gene Mutation Frequency per Kb -',eff),
-                          left = text_grob(TeX('Normalized $log_{10}$(Mut. Freq.)'), rot = 90),
-                          bottom = 'Cancer Type')
+    #plt = ggarrange(plt_bycancer, plt_pancancer, ncol=2, widths=c(1.5,0.3))
+    #plt = annotate_figure(plt,
+    #                      top = paste('Gene Mutation Frequency per Kb -',eff),
+    #                      left = text_grob(TeX('Normalized $log_{10}$(Mut. Freq.)'), rot = 90),
+    #                      bottom = 'Cancer Type')
     
-    plts[[plt_name]] = plt
+    plts[[plt_name]] = list(bycancer=plt_bycancer, pancancer=plt_pancancer)
 }
 
+
 # save plots
-figs = plts
-lapply(names(figs), function(plt_name){ 
-    filename = file.path(fig_dir,paste0(plt_name,'.png'))
-    ggsave(filename, figs[[plt_name]], width = WIDTH, height = HEIGHT, dpi = 200) 
-})
-
-
-
-# distribution of mutation frequencies across the whole genome
-plt = ggstripchart(snv, x='effect', y='z_score', alpha=0.5, color='darkgrey', size=0.5) + geom_violin(color='black', alpha=0.1) + geom_jitter(data = subset(snv, is_oi), aes(x=effect, y=z_score), color='darkred', size=1) + theme_pubr(x.text.angle = 45, legend='none') + ggtitle('PANCAN Gene Mutation Frequency per Kb') + ylab(TeX('Normalized $log_{10}$(Mut. Freq.)')) + xlab('Mutation Effect') + geom_hline(yintercept = c(-1.96,1.96), linetype='dashed')
-
-# save
-filename = file.path(fig_dir,'snv_freq_distr.png')
-ggsave(filename, plt, width = WIDTH, height = HEIGHT, dpi=200)
+saveRDS(plts, output_file)
 
 print('Done!')

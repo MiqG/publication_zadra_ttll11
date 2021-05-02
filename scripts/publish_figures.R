@@ -16,6 +16,7 @@ require(ggpubr)
 require(latex2exp)
 require(patchwork)
 
+
 # variables
 ROOT = here::here()
 RESULTS_DIR = file.path(ROOT,'results')
@@ -38,7 +39,7 @@ filenames = c('differential_expression','correlation_with_scores','mutation_freq
 rds_files = file.path(FIGURES_DIR,paste0(filenames,'.rds'))
 
 # outputs
-fig_expression_aneuploidy_file = file.path(FIGURES_DIR,'expression_aneuploidy.png')
+fig_expression_aneuploidy_file = file.path(FIGURES_DIR,'expression_aneuploidy')
 fig_mutations_file = file.path(FIGURES_DIR,'mutations.png')
 
 ##### SCRIPT #####
@@ -92,12 +93,13 @@ fig = expression / aneuploidy +
     )
 
 # save
-ggsave(fig_expression_aneuploidy_file, fig, width = WIDTH_2COL, height = 12, units = 'cm', dpi = 300)
+ggsave(paste0(fig_expression_aneuploidy_file,'.png'), fig, width = WIDTH_2COL, units = 'cm', dpi = 300)
+ggsave(paste0(fig_expression_aneuploidy_file,'.pdf'), fig, width = WIDTH_2COL, units = 'cm', dpi = 300, device = cairo_pdf)
 
 ##### TTLL11 mutations #####
-names(plts[['mutation_frequency']])
-
-mutations = sapply(names(plts[['mutation_frequency']]), function(plt_name){
+plt_names_oi = c('Missense_Mutation','Nonsense_Mutation','3\'UTR','Splice_Site','Frame_Shift_Del')
+plt_names_oi = paste0('effect_by_cancer-',plt_names_oi)
+mutations = sapply(plt_names_oi, function(plt_name){
     plt = plts[['mutation_frequency']][[plt_name]]
     plt = ggarrange(
         plt[['bycancer']] + 
@@ -114,7 +116,7 @@ mutations = sapply(names(plts[['mutation_frequency']]), function(plt_name){
                                              size = FONT_SIZE, 
                                              family = FONT_FAMILY,
                                              vjust = -0.75)
-                         )
+                          )
     
     return(plt)
 }, simplify=FALSE)
@@ -131,6 +133,6 @@ fig = wrap_plots(mutations, ncol=1) +
 
 # save
 ggsave(fig_mutations_file, fig, width = WIDTH_2COL, 
-       height = 6*length(plts[['mutation_frequency']]), units = 'cm', dpi = 300)
+       height = 4*length(plts[['mutation_frequency']]), units = 'cm', dpi = 300)
 
 print('Done!')

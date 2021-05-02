@@ -60,7 +60,7 @@ correlations = foreach(cancer_type_oi=cancer_types,
 
     # read gene expression for these samples
     genexpr = read.columns(genexpr_file, required.col = c('sample',samples_oi))
-    genexpr[,samples_oi] = log10(genexpr[,samples_oi]+1)
+    genexpr[,samples_oi] = genexpr[,samples_oi]
 
     # compute correlations
     x = t(genexpr[,samples_oi])

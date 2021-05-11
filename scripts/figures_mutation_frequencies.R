@@ -19,6 +19,7 @@ require(ggpubr)
 require(ggrepel)
 require(latex2exp)
 require(gtools)
+require(writexl)
 
 # variables
 ROOT = here::here()
@@ -36,6 +37,7 @@ snv_counts_file = file.path(RESULTS_DIR,'files','snv_gene_freq.tsv')
 
 # outputs
 output_file = file.path(RESULTS_DIR,'figures','mutation_frequency.rds')
+output_figdata = file.path(RESULTS_DIR,'files','figdata-mutation_frequency.xlsx')
 
 
 ##### FUCNTIONS #####
@@ -89,7 +91,12 @@ snv = snv %>% filter(effect %in% effects_oi)
 df = snv
 
 # compute z-score and pvalue by cancer and effect
-df = df %>% group_by(cancer_type,effect) %>% mutate(z_score=as.numeric(scale(log10(freq_per_kb))),pvalue=pnorm(-abs(z_score)))
+df = df %>% 
+    group_by(cancer_type,effect) %>% 
+    mutate(
+        z_score=as.numeric(scale(log10(freq_per_kb))),
+        pvalue=pnorm(-abs(z_score))
+    )
 
 # plot
 plts = list()
@@ -100,8 +107,13 @@ for (eff in unique(df$effect)){
     plt_bycancer = make_plot_bycancer(df %>% filter(effect==eff))
     
     # pancancer
-    df_pancancer = df %>% group_by(gene,effect) %>% summarize(freq_per_kb=median(freq_per_kb))
-    df_pancancer = df_pancancer %>% group_by(effect) %>% mutate(z_score=as.numeric(scale(log10(freq_per_kb))),pvalue=pnorm(-abs(z_score)))
+    df_pancancer = df %>% 
+        group_by(gene,effect) %>% 
+        summarize(freq_per_kb=median(freq_per_kb))
+    df_pancancer = df_pancancer %>% 
+        group_by(effect) %>% 
+        mutate(z_score=as.numeric(scale(log10(freq_per_kb))),
+               pvalue=pnorm(-abs(z_score)))
     df_pancancer$cancer_type = 'PANCAN'
     plt_pancancer = make_plot_bycancer(df_pancancer %>% filter(effect==eff), is_pancan = TRUE)
     
@@ -115,8 +127,24 @@ for (eff in unique(df$effect)){
     plts[[plt_name]] = list(bycancer=plt_bycancer, pancancer=plt_pancancer)
 }
 
+# prepare figure data
+df_pancan = df %>% 
+    group_by(gene, gene_length, effect) %>% 
+    summarize(n=n(), freq_per_kb=median(freq_per_kb)) %>% 
+    ungroup() %>% 
+    mutate(z_score=as.numeric(scale(freq_per_kb)), 
+           pvalue=pnorm(-abs(z_score))) %>% 
+    mutate(cancer_type='PANCAN')
+
+common_cols = intersect(colnames(df),colnames(df_pancan))
+figdata = rbind(df[,common_cols], df_pancan[,common_cols])
 
 # save plots
 saveRDS(plts, output_file)
+## figure data
+write_xlsx(
+    x = list(mutation_frequency = figdata),
+    path = output_figdata
+)
 
 print('Done!')

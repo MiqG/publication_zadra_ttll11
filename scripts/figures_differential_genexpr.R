@@ -11,6 +11,7 @@ require(tidyverse)
 require(limma)
 require(magrittr)
 require(ggpubr)
+require(writexl)
 
 ROOT = here::here()
 DATA_DIR = file.path(ROOT,'data')
@@ -30,6 +31,7 @@ genexpr_file = file.path(RESULTS_DIR,'files','genexpr_TTLL11.tsv')
 
 # outputs
 output_file = file.path(RESULTS_DIR,'figures','differential_expression.rds')
+output_figdata = file.path(RESULTS_DIR,'files','figdata-differential_expression.xlsx')
 
 # load data
 df = read_tsv(genexpr_file)
@@ -38,6 +40,7 @@ df = read_tsv(genexpr_file)
 df = df %>% 
     mutate(sample_type = factor(sample_type, levels = SAMPLE_TYPES_OI),
            cancer_type = factor(cancer_type, levels = CANCERS_OI))
+
 
 # plot
 make_plot = function(X){
@@ -57,8 +60,28 @@ plts = list()
 plts[['bycancer']] = make_plot(df) + scale_y_continuous(limits = quantile(df$expression, c(0.001, 0.999))) 
 plts[['pancancer']] = make_plot(df %>% mutate(cancer_type=factor('PANCAN'))) + scale_y_continuous(limits = quantile(df$expression, c(0.001, 0.999)))
 
-# save
-saveRDS(plts, output_file)
+# prepare figure data
+result = df %>% 
+    group_by(cancer_type) %>% 
+    do(w = wilcox.test(expression ~ sample_type, data=., paired=FALSE)) %>%
+    summarize(cancer_type, statistic = w$statistic, 
+              p_value = w$p.value, method = w$method, comparison = w$data.name)
 
+sample_summary = df %>%
+    group_by(cancer_type, sample_type) %>%
+    summarize(n = n(),
+              median = median(expression),
+              mean = mean(expression),
+              std = sd(expression),
+              mad = mad(expression))
+
+# save
+## figure
+saveRDS(plts, output_file)
+## figure data
+write_xlsx(
+    x = list(sample_summary = sample_summary, test_result = result),
+    path = output_figdata
+)
 
 print('Done!')

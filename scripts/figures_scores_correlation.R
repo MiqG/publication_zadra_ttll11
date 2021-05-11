@@ -16,6 +16,7 @@ require(tidyr)
 require(reshape2)
 require(latex2exp)
 require(gtools)
+require(writexl)
 
 GENE_OI = 'TTLL11'
 ORDER_OI = c('LUSC','UCEC','BRCA','STAD','LUAD','KIRP','THCA','KICH','COAD','LIHC','HNSC','PRAD','KIRC')
@@ -36,7 +37,7 @@ correlations_aneuploidy_file = file.path(RESULTS_DIR,'files','correlation-genexp
 
 # outputs
 output_file = file.path(RESULTS_DIR,'figures','correlation_with_scores.rds')
-
+output_figdata = file.path(RESULTS_DIR,'files','figdata-correlation_with_scores.xlsx')
 
 ##### FUNCTIONS ######
 .make_plot = function(df, plt_title, gene_oi=GENE_OI, y_lab_pos=-0.6){
@@ -90,26 +91,29 @@ make_plot = function(df, plt_title, gene_oi=GENE_OI, y_lab_pos=-0.6){
 
 ##### Data wrangling ######
 # load data
-correlations_ca = read_tsv(correlations_ca_file)
 correlations_aneuploidy = read_tsv(correlations_aneuploidy_file)
 
 # transform to long format
-correlations_ca = correlations_ca %>% melt() %>% separate(variable,c('cancer_type','sample_type')) %>% mutate(score_type = 'Centrosome Amplification (CA20)', sample_type = gsub("([a-z])([A-Z])","\\1 \\2", sample_type))
-correlations_aneuploidy = correlations_aneuploidy %>% melt() %>% rename(cancer_type = variable) %>% mutate(sample_type = 'Primary Tumor', score_type = 'Aneuploidy') 
+correlations_aneuploidy = correlations_aneuploidy %>% 
+    melt() %>% 
+    rename(cancer_type = variable) %>% 
+    mutate(sample_type = 'Primary Tumor', score_type = 'Aneuploidy') 
 
 
 # filter
-correlations_ca = correlations_ca %>% filter(cancer_type %in% ORDER_OI)
 correlations_aneuploidy = correlations_aneuploidy %>% filter(cancer_type %in% ORDER_OI)
 
 plts = list()
 
-##### PLOTS ANEUPLOIDY #####
 # init
 df = correlations_aneuploidy
 
 # compute z-scores and pvalues by cancer
-df = df %>% group_by(cancer_type) %>% mutate(z_score=scale(value),pvalue=pnorm(-abs(z_score))) %>% ungroup()
+df = df %>% 
+    group_by(cancer_type) %>% 
+    mutate(z_score=as.numeric(scale(value)),
+           pvalue=pnorm(-abs(z_score))) %>% 
+    ungroup()
 
 # change group order
 df = df %>% mutate(cancer_type = factor(cancer_type, levels=ORDER_OI))
@@ -122,12 +126,29 @@ gene_oi = GENE_OI
 plts[['aneuploidy_bycancer']] = make_plot(df, plt_title, gene_oi, -0.7)
 
 # prepare pancancer
-df_pancan = df %>% group_by(gene) %>% summarize(value=median(value)) %>% ungroup() %>% mutate(z_score=as.numeric(scale(value)), pvalue=pnorm(-abs(z_score))) %>% mutate(cancer_type='PANCAN')
+df_pancan = df %>% 
+    group_by(gene) %>% 
+    summarize(value=median(value)) %>% 
+    ungroup() %>% 
+    mutate(z_score=as.numeric(scale(value)), pvalue=pnorm(-abs(z_score))) %>% 
+    mutate(cancer_type='PANCAN')
 
 # plot pancancer
 plts[['aneuploidy_pancancer']] = make_plot(df_pancan, plt_title, gene_oi, -0.4)
 
+# prepare figure data
+common_cols = intersect(colnames(df), colnames(df_pancan))
+figdata = rbind(df[,common_cols], df_pancan[,common_cols]) %>% 
+    rename(correlation = value) %>%
+    mutate(method='Spearman')
+
 # save
+## plots
 saveRDS(plts, output_file)
+## figure data
+write_xlsx(
+    x = list(correlation_aneuploidy = figdata),
+    path = output_figdata
+)
 
 print('Done!')

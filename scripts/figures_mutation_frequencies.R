@@ -63,8 +63,7 @@ make_plot_bycancer = function(df, gene_oi=GENE_OI, y_lab_pos=-5, is_pancan=FALSE
         group2=NA)
 
     ## plot
-    plt = ggstripchart(df, x='cancer_type', y='z_score', color='darkgrey', alpha=.1, size=0.5) +
-    geom_violin(alpha=0.5, lwd=0.2) + 
+    plt = ggviolin(df, x='cancer_type', y='z_score', color='darkgrey', alpha=0.5, lwd=0.2) +
     geom_boxplot(width=0.1, outlier.shape = NA, lwd=0.1) + 
     geom_point(data = df %>% filter(gene == 'TTLL11'), color='darkred', size=1) + 
     xlab(element_blank()) + ylab(element_blank()) + ggtitle(element_blank()) + 

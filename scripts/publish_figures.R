@@ -40,7 +40,7 @@ rds_files = file.path(FIGURES_DIR,paste0(filenames,'.rds'))
 
 # outputs
 fig_expression_aneuploidy_file = file.path(FIGURES_DIR,'expression_aneuploidy')
-fig_mutations_file = file.path(FIGURES_DIR,'mutations.png')
+fig_mutations_file = file.path(FIGURES_DIR,'mutations')
 
 ##### SCRIPT #####
 # load data
@@ -132,7 +132,9 @@ fig = wrap_plots(mutations, ncol=1) +
     )
 
 # save
-ggsave(fig_mutations_file, fig, width = WIDTH_2COL, 
+ggsave(paste0(fig_mutations_file,'.png'), fig, width = WIDTH_2COL, 
        height = 4*length(plts[['mutation_frequency']]), units = 'cm', dpi = 300)
+ggsave(paste0(fig_mutations_file,'.pdf'), fig, width = WIDTH_2COL, 
+       height = 4*length(plts[['mutation_frequency']]), units = 'cm', dpi = 300, device = cairo_pdf)
 
 print('Done!')

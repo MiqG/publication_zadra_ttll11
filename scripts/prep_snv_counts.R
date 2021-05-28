@@ -17,14 +17,13 @@ ROOT = here::here()
 DATA_DIR = file.path(ROOT,'data')
 TCGA_DIR = file.path(DATA_DIR,'raw','UCSCXena','TCGA')
 PREP_DIR = file.path(DATA_DIR,'prep')
-RESULTS_DIR = file.path(ROOT,'results')
 
 # inputs
 raw_snv_file = file.path(TCGA_DIR,'snv','mc3.v0.2.8.PUBLIC.xena.gz')
 phenotype_file = file.path(PREP_DIR,'sample_phenotype.tsv')
 
 # outputs
-snv_counts_file = file.path(RESULTS_DIR,'files','snv_gene_freq.tsv')
+snv_counts_file = file.path(PREP_DIR,'snv_gene_freq.tsv')
 
 # load data
 ## phenotype

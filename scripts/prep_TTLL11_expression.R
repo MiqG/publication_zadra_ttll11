@@ -7,21 +7,19 @@ ROOT = here::here()
 DATA_DIR = file.path(ROOT,'data')
 TCGA_DIR = file.path(DATA_DIR,'raw','UCSCXena','TCGA')
 PREP_DIR = file.path(DATA_DIR,'prep')
-RESULTS_DIR = file.path(ROOT,'results')
 
 # variables
 CANCERS_OI = c('LUSC','UCEC','BRCA','STAD','LUAD','KIRP','THCA','KICH','COAD','LIHC','HNSC','PRAD','KIRC')
 SAMPLE_TYPES_OI = c('Solid Tissue Normal','Primary Tumor')
 GENE_OI = 'TTLL11'
 
-TEST_METHOD = 'wilcox.test'
 
 # inputs
 phenotype_file = file.path(PREP_DIR,'sample_phenotype.tsv')
 genexpr_file = file.path(TCGA_DIR,'rnaseq','AdjustPANCAN_IlluminaHiSeq_RNASeqV2.geneExp.xena.gz')
 
 # outputs
-output_file = file.path(RESULTS_DIR,'files','genexpr_TTLL11.tsv')
+output_file = file.path(PREP_DIR,'genexpr_TTLL11.tsv')
 
 # load data
 metadata = read_tsv(phenotype_file) %>% 

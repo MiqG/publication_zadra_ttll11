@@ -2,17 +2,17 @@
 # Author: Miquel Anglada Girotto
 # Contact: miquel [dot] anglada [at] crg [dot] eu
 #
-# Script purpose
-# --------------
-# Workflow to carry out whole bioinformatic analysis for the article 
-# Zadra *et al.* 2021 (DOI: ).
+# Workflow purpose
+# ----------------
+# Carry out whole bioinformatic analysis for the article:
+# Zadra *et al.* XXXX (DOI: XXXX).
 #
 # Outline
 # -------
 # 0. Download data
 # 1. Preprocess data:
 #    - Subset phenotype data with samples of interest (>20 STN and PT samples per cancer).
-#    - clean aneuploidy and centrosome amplification scores downloaded from articles.
+#    - clean aneuploidy scores downloaded from article.
 # 2. Expression of TTLL11 and TTLL13 across human tissues.
 # 3. Differential expression of TTLL11 across cancer types.
 # 4. Correlation between aneuploidy score and expression of TTLL11 across cancer types.
@@ -29,8 +29,7 @@ PREP_DIR = os.path.join(DATA_DIR,'prep')
 GTEX_DIR = os.path.join(RAW_DIR,'GTEx','v8')
 XENA_DIR = os.path.join(RAW_DIR,'UCSCXena')
 ARTICLES_DIR = os.path.join(RAW_DIR,'articles')
-
-print(ROOT)
+RESULTS_DIR = os.path.join(ROOT,'results')
 
 ##### RULES ######
 rule all:
@@ -44,7 +43,14 @@ rule all:
         '.done/prep-sample_phenotype.done',
         '.done/prep-aneuploidy.done',
         '.done/prep-snv.done',
-        '.done/prep-genexpr_TTLL11.done'
+        '.done/prep-genexpr_TTLL11.done',
+        '.done/prep-gtex.done',
+        
+        # expression of TTLL11 and TTLL13 in tissues
+        '.done/genexpr_human_tissues.done',
+        
+        # differential expression of TTLL11 across cancer types
+        '.done/diffexpr_TTLL11.done'
         
 
 ##### 0. Download data #####
@@ -201,5 +207,54 @@ rule prep_genexpr_TTLL11:
         """
         Rscript scripts/prep_TTLL11_expression.R
         """
+
+rule prep_gtex:
+    input:
+        gene_tpms = os.path.join(GTEX_DIR,'rnaseq','GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_tpm.gct.gz')
+    output:
+        touch('.done/prep-gtex.done'),
+        gene_tpms = os.path.join(PREP_DIR,'genexpr_gtex.tsv.gz')
+    shell:
+        """
+        zgrep -e "GTEX\|TTLL11\|TTLL13" {input} | gzip > {output.gene_tpms}
+        """
         
-##### 2. #####
+    
+##### 2. Gene expression of TTLL11 and TTLL13 across human tissues #####
+rule gtex_genexpr:
+    input:
+        gene_tpms = os.path.join(PREP_DIR,'genexpr_gtex.tsv.gz'),
+        sampleattr = os.path.join(GTEX_DIR,'annotations','GTEx_Analysis_v8_Annotations_SampleAttributesDS.txt') 
+    output:
+        touch('.done/genexpr_human_tissues.done'),
+        os.path.join(RESULTS_DIR,'figures','gtex-heatmap.pdf')
+    shell:
+        """
+        Rscript scripts/figures_gtex_expression.R
+        """
+        
+##### 3. Differential expression of TTLL11 across cancer types #####
+rule diffexpr_TTLL11:
+    input:
+        genexpr = os.path.join(PREP_DIR,'genexpr_TTLL11.tsv'),
+    output:
+        touch('.done/diffexpr_TTLL11.done'),
+        rds = os.path.join(RESULTS_DIR,'figures','differential_expression.rds'),
+        figdata = os.path.join(RESULTS_DIR,'files','figdata-differential_expression.xlsx')
+    shell:
+        """
+        Rscript scripts/figures_differential_genexpr.R
+        """
+
+##### 4. Correlation between aneuploidy score and expression of TTLL11 #####
+rule correlate_aneuploidy:
+    input:
+        aneuploidy_scores = os.path.join(PREP_DIR,'aneuploidy.tsv')
+        phenotype = os.path.join(PREP_DIR,'sample_phenotype.tsv')
+        genexpr = os.path.join(TCGA_DIR,'rnaseq','AdjustPANCAN_IlluminaHiSeq_RNASeqV2.geneExp.xena.gz')
+    output:
+        correlations_file = os.path.join(RESULTS_DIR,'files','correlation-genexpr_aneuploidy.tsv')
+    shell:
+        """
+        Rscript scripts/cor_genexpr_aneuploidy.R
+        """

@@ -1,3 +1,13 @@
+# 
+# Author: Miquel Anglada Girotto
+# Contact: miquel [dot] anglada [at] crg [dot] eu
+#
+# Script purpose
+# --------------
+# Subset expression of TTLL11 across samples and combine
+# with sample metadata.
+# 
+
 require(tidyverse)
 require(limma)
 require(magrittr)

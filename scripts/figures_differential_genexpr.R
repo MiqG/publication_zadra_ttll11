@@ -27,7 +27,7 @@ GENE_OI = 'TTLL11'
 TEST_METHOD = 'wilcox.test'
 
 # inputs
-genexpr_file = file.path(RESULTS_DIR,'files','genexpr_TTLL11.tsv')
+genexpr_file = file.path(PREP_DIR,'genexpr_TTLL11.tsv')
 
 # outputs
 output_file = file.path(RESULTS_DIR,'figures','differential_expression.rds')

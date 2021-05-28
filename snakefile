@@ -54,7 +54,12 @@ rule all:
         '.done/diffexpr_TTLL11.done',
         
         # correlation gene expression vs aneuploidy score
-        '.done/aneuploidy_correlation.done'
+        '.done/aneuploidy_correlation.done',
+        
+        # mutation frequency
+        '.done/mutation_frequency.done'
+        
+        # publish figures
         
         
         
@@ -277,4 +282,25 @@ rule figures_gene_aneuploidy_correlation:
         """
         Rscript scripts/figures_aneuploidy_correlation.R
         """
-        
+
+##### 5. Mutation frequency per kilobase of every gene in primary tumors #####
+rule mutation_frequency:
+    input:
+        snv_freq = os.path.join(PREP_DIR,'snv_gene_freq.tsv')
+    output:
+        touch('.done/mutation_frequency.done'),
+        rds = os.path.join(RESULTS_DIR,'figures','mutation_frequency.rds'),
+        figdata = os.path.join(RESULTS_DIR,'files','figdata-mutation_frequency.xlsx')
+    shell:
+        """
+        Rscript scripts/figures_mutation_frequencies.R
+        """
+
+##### 6. Prepare figures for publication #####
+rule publish_figures:
+    input:
+    output:
+    shell:
+        """
+        Rscript scripts/publish_figures.R
+        """

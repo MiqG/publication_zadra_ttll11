@@ -23,6 +23,7 @@ require(writexl)
 
 # variables
 ROOT = here::here()
+PREP_DIR = file.path(ROOT,'data','prep')
 RESULTS_DIR = file.path(ROOT,'results')
 
 GENE_OI = 'TTLL11'
@@ -33,7 +34,7 @@ HEIGHT = 4
 BASE_SIZE = 10
 
 # inputs
-snv_counts_file = file.path(RESULTS_DIR,'files','snv_gene_freq.tsv')
+snv_counts_file = file.path(PREP_DIR,'snv_gene_freq.tsv')
 
 # outputs
 output_file = file.path(RESULTS_DIR,'figures','mutation_frequency.rds')

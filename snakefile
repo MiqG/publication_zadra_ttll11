@@ -57,10 +57,10 @@ rule all:
         '.done/aneuploidy_correlation.done',
         
         # mutation frequency
-        '.done/mutation_frequency.done'
+        '.done/mutation_frequency.done',
         
         # publish figures
-        
+        '.done/publish_figures.done'
         
         
 
@@ -299,8 +299,15 @@ rule mutation_frequency:
 ##### 6. Prepare figures for publication #####
 rule publish_figures:
     input:
+        os.path.join(RESULTS_DIR,'figures','mutation_frequency.rds'),
+        os.path.join(RESULTS_DIR,'figures','differential_expression.rds'),
+        os.path.join(RESULTS_DIR,'figures','correlation_with_scores.rds')
     output:
+        touch('.done/publish_figures.done'),
+        os.path.join(RESULTS_DIR,'figures','expression_aneuploidy.pdf'),
+        os.path.join(RESULTS_DIR,'figures','mutations.pdf')
     shell:
         """
         Rscript scripts/publish_figures.R
         """
+        

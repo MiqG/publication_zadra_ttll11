@@ -4,7 +4,7 @@
 #
 # Script purpose
 # --------------
-# Make figure of correlations between aneuploidy and centromere amplification scores 
+# Make figure of correlations between aneuploidy scores 
 # with gene expression by cancer and sample types.
 #
 
@@ -32,7 +32,6 @@ BASE_SIZE = 10
 N_SAMPLE = 1000
 
 # inputs
-correlations_ca_file = file.path(RESULTS_DIR,'files','correlation-genexpr_centrosome_amplification.tsv')
 correlations_aneuploidy_file = file.path(RESULTS_DIR,'files','correlation-genexpr_aneuploidy.tsv') 
 
 # outputs
@@ -40,31 +39,6 @@ output_file = file.path(RESULTS_DIR,'figures','correlation_with_scores.rds')
 output_figdata = file.path(RESULTS_DIR,'files','figdata-correlation_with_scores.xlsx')
 
 ##### FUNCTIONS ######
-.make_plot = function(df, plt_title, gene_oi=GENE_OI, y_lab_pos=-0.6){
-    # plot spearman correlation values as stripchart and violin
-    # highlighting TTLL11 and adding the p-value of the Z-score of 
-    # TTLL11 as labels
-    
-    ## prepare pvalues in gene OI
-    stat.test = df %>% filter(gene == GENE_OI) %>% 
-        mutate(
-            p=pvalue, 
-            p.format=format.pval(pvalue,1),
-            p.signif=stars.pval(pvalue),
-            group1=NA,
-            group2=NA)
-
-    ## plot
-    plt = ggstripchart(df, x='cancer_type', y='value', color='darkgrey', alpha=.1, size=0.5) +
-    geom_violin(alpha=0.5, lwd=0.2) + 
-    geom_boxplot(width=0.1, outlier.shape = NA, lwd=0.1) + 
-    geom_point(data = df %>% filter(gene == 'TTLL11'), color='darkred', size=1) + 
-    xlab(element_blank()) + ylab(element_blank()) + ggtitle(element_blank()) + 
-    stat_pvalue_manual(stat.test, x = 'cancer_type', y.position = y_lab_pos, label = 'p.signif')
-    plt = ggpar(plt, font.tickslab = c(BASE_SIZE))
-    return(plt)
-}
-
 make_plot = function(df, plt_title, gene_oi=GENE_OI, y_lab_pos=-0.6){
     # plot spearman correlation values as stripchart and violin
     # highlighting TTLL11 and adding the p-value of the Z-score of 

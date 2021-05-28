@@ -17,6 +17,7 @@
 # 3. Differential expression of TTLL11 across cancer types.
 # 4. Correlation between aneuploidy score and expression of TTLL11 across cancer types.
 # 5. Mutation frequency per kilobase of every gene in primary tumors.
+# 6. Prepare publishable figures
 
 import os
 import pathlib
@@ -50,7 +51,12 @@ rule all:
         '.done/genexpr_human_tissues.done',
         
         # differential expression of TTLL11 across cancer types
-        '.done/diffexpr_TTLL11.done'
+        '.done/diffexpr_TTLL11.done',
+        
+        # correlation gene expression vs aneuploidy score
+        '.done/aneuploidy_correlation.done'
+        
+        
         
 
 ##### 0. Download data #####
@@ -249,12 +255,26 @@ rule diffexpr_TTLL11:
 ##### 4. Correlation between aneuploidy score and expression of TTLL11 #####
 rule correlate_aneuploidy:
     input:
-        aneuploidy_scores = os.path.join(PREP_DIR,'aneuploidy.tsv')
-        phenotype = os.path.join(PREP_DIR,'sample_phenotype.tsv')
-        genexpr = os.path.join(TCGA_DIR,'rnaseq','AdjustPANCAN_IlluminaHiSeq_RNASeqV2.geneExp.xena.gz')
+        aneuploidy_scores = os.path.join(PREP_DIR,'aneuploidy.tsv'),
+        phenotype = os.path.join(PREP_DIR,'sample_phenotype.tsv'),
+        genexpr = os.path.join(XENA_DIR,'TCGA','rnaseq','AdjustPANCAN_IlluminaHiSeq_RNASeqV2.geneExp.xena.gz')
+    threads: 10
     output:
-        correlations_file = os.path.join(RESULTS_DIR,'files','correlation-genexpr_aneuploidy.tsv')
+        correlations = os.path.join(RESULTS_DIR,'files','correlation-genexpr_aneuploidy.tsv')
     shell:
         """
         Rscript scripts/cor_genexpr_aneuploidy.R
         """
+        
+rule figures_gene_aneuploidy_correlation:
+    input:
+        correlations = os.path.join(RESULTS_DIR,'files','correlation-genexpr_aneuploidy.tsv')
+    output:
+        touch('.done/aneuploidy_correlation.done'),
+        rds = os.path.join(RESULTS_DIR,'figures','correlation_with_scores.rds'),
+        figdata = os.path.join(RESULTS_DIR,'files','figdata-correlation_with_scores.xlsx')
+    shell:
+        """
+        Rscript scripts/figures_aneuploidy_correlation.R
+        """
+        

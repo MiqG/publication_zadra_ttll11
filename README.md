@@ -31,7 +31,7 @@ In brackets, the version used in this project.
 
 ## Usage
 ```shell
-git clone
+git clone https://github.com/MiqG/Zadra_2021.git
 cd Zadra_2021
 snakemake --cores 10
 ```

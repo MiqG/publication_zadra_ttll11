@@ -51,17 +51,13 @@ rule all:
         '.done/genexpr_human_tissues.done',
         
         # differential expression of TTLL11 across cancer types
-        '.done/diffexpr_TTLL11.done',
+        os.path.join(RESULTS_DIR,'figures','differential_expression.pdf'),
         
         # correlation gene expression vs aneuploidy score
-        '.done/aneuploidy_correlation.done',
+        os.path.join(RESULTS_DIR,'figures','aneuploidy_correlations.pdf'),
         
         # mutation frequency
-        '.done/mutation_frequency.done',
-        
-        # publish figures
-        '.done/publish_figures.done'
-        
+        os.path.join(RESULTS_DIR,'figures','mutation_frequency.pdf')        
         
 
 ##### 0. Download data #####
@@ -249,8 +245,7 @@ rule diffexpr_TTLL11:
     input:
         genexpr = os.path.join(PREP_DIR,'genexpr_TTLL11.tsv'),
     output:
-        touch('.done/diffexpr_TTLL11.done'),
-        rds = os.path.join(RESULTS_DIR,'figures','differential_expression.rds'),
+        figure = os.path.join(RESULTS_DIR,'figures','differential_expression.pdf'),
         figdata = os.path.join(RESULTS_DIR,'files','figdata-differential_expression.xlsx')
     shell:
         """
@@ -275,9 +270,8 @@ rule figures_gene_aneuploidy_correlation:
     input:
         correlations = os.path.join(RESULTS_DIR,'files','correlation-genexpr_aneuploidy.tsv')
     output:
-        touch('.done/aneuploidy_correlation.done'),
-        rds = os.path.join(RESULTS_DIR,'figures','correlation_with_scores.rds'),
-        figdata = os.path.join(RESULTS_DIR,'files','figdata-correlation_with_scores.xlsx')
+        figure = os.path.join(RESULTS_DIR,'figures','aneuploidy_correlations.pdf'),
+        figdata = os.path.join(RESULTS_DIR,'files','figdata-aneuploidy_correlations.xlsx')
     shell:
         """
         Rscript scripts/figures_aneuploidy_correlation.R
@@ -288,26 +282,9 @@ rule mutation_frequency:
     input:
         snv_freq = os.path.join(PREP_DIR,'snv_gene_freq.tsv')
     output:
-        touch('.done/mutation_frequency.done'),
-        rds = os.path.join(RESULTS_DIR,'figures','mutation_frequency.rds'),
+        figure = os.path.join(RESULTS_DIR,'figures','mutation_frequency.pdf'),
         figdata = os.path.join(RESULTS_DIR,'files','figdata-mutation_frequency.xlsx')
     shell:
         """
         Rscript scripts/figures_mutation_frequencies.R
         """
-
-##### 6. Prepare figures for publication #####
-rule publish_figures:
-    input:
-        os.path.join(RESULTS_DIR,'figures','mutation_frequency.rds'),
-        os.path.join(RESULTS_DIR,'figures','differential_expression.rds'),
-        os.path.join(RESULTS_DIR,'figures','correlation_with_scores.rds')
-    output:
-        touch('.done/publish_figures.done'),
-        os.path.join(RESULTS_DIR,'figures','expression_aneuploidy.pdf'),
-        os.path.join(RESULTS_DIR,'figures','mutations.pdf')
-    shell:
-        """
-        Rscript scripts/publish_figures.R
-        """
-        

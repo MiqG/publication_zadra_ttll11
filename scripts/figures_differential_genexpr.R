@@ -12,6 +12,7 @@ require(limma)
 require(magrittr)
 require(ggpubr)
 require(writexl)
+require(latex2exp)
 
 ROOT = here::here()
 DATA_DIR = file.path(ROOT,'data')
@@ -26,11 +27,14 @@ GENE_OI = 'TTLL11'
 
 TEST_METHOD = 'wilcox.test'
 
+FONT_SIZE = 7 # pt
+FONT_FAMILY = 'helvetica'
+
 # inputs
 genexpr_file = file.path(PREP_DIR,'genexpr_TTLL11.tsv')
 
 # outputs
-output_file = file.path(RESULTS_DIR,'figures','differential_expression.rds')
+output_file = file.path(RESULTS_DIR,'figures','differential_expression.pdf')
 output_figdata = file.path(RESULTS_DIR,'files','figdata-differential_expression.xlsx')
 
 # load data
@@ -60,6 +64,28 @@ plts = list()
 plts[['bycancer']] = make_plot(df) + scale_y_continuous(limits = quantile(df$expression, c(0.001, 0.999))) 
 plts[['pancancer']] = make_plot(df %>% mutate(cancer_type=factor('PANCAN'))) + scale_y_continuous(limits = quantile(df$expression, c(0.001, 0.999)))
 
+# compose figure
+widths_cancer_type = c(1.15,0.13)
+
+plt = ggarrange(
+    plts[['bycancer']] + 
+        ylab(TeX('$log_2(Norm. Count + 1)$')) + 
+        theme_pubr(base_size = FONT_SIZE) +
+        theme(plot.margin = margin(0,0,0,0, "cm")),
+    #NULL,
+    plts[['pancancer']] + 
+        theme_pubr(base_size = FONT_SIZE) +
+        theme(plot.margin = margin(0,0,0,0, "cm")),
+    widths = widths_cancer_type,
+    common.legend = TRUE,
+    ncol = 2
+) %>% annotate_figure(bottom = text_grob('Cancer Type', 
+                                         size = FONT_SIZE, 
+                                         family = FONT_FAMILY,
+                                         vjust = -0.5)
+                     ) +
+    theme(plot.margin = margin(0.1,0.1,0.1,0.1, "cm")) 
+
 # prepare figure data
 result = df %>% 
     group_by(cancer_type) %>% 
@@ -77,7 +103,8 @@ sample_summary = df %>%
 
 # save
 ## figure
-saveRDS(plts, output_file)
+ggsave(plt, filename=output_file, units = 'cm', width=12, dpi=300, height=8.5, device=cairo_pdf)
+
 ## figure data
 write_xlsx(
     x = list(sample_summary = sample_summary, test_result = result),

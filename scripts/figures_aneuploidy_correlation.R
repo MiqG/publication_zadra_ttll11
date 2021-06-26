@@ -17,6 +17,7 @@ require(reshape2)
 require(latex2exp)
 require(gtools)
 require(writexl)
+require(latex2exp)
 
 GENE_OI = 'TTLL11'
 ORDER_OI = c('LUSC','UCEC','BRCA','STAD','LUAD','KIRP','THCA','KICH','COAD','LIHC','HNSC','PRAD','KIRC')
@@ -29,14 +30,17 @@ WIDTH = 7.5
 HEIGHT = 4
 BASE_SIZE = 10
 
+FONT_SIZE = 7 # pt
+FONT_FAMILY = 'helvetica'
+
 N_SAMPLE = 1000
 
 # inputs
 correlations_aneuploidy_file = file.path(RESULTS_DIR,'files','correlation-genexpr_aneuploidy.tsv') 
 
 # outputs
-output_file = file.path(RESULTS_DIR,'figures','correlation_with_scores.rds')
-output_figdata = file.path(RESULTS_DIR,'files','figdata-correlation_with_scores.xlsx')
+output_file = file.path(RESULTS_DIR,'figures','aneuploidy_correlations.pdf')
+output_figdata = file.path(RESULTS_DIR,'files','figdata-aneuploidy_correlations.xlsx')
 
 ##### FUNCTIONS ######
 make_plot = function(df, plt_title, gene_oi=GENE_OI, y_lab_pos=-0.6){
@@ -110,6 +114,26 @@ df_pancan = df %>%
 # plot pancancer
 plts[['aneuploidy_pancancer']] = make_plot(df_pancan, plt_title, gene_oi, -0.4)
 
+# compose figure
+widths_cancer_type = c(1.15,0.13)
+
+plt = ggarrange(
+    plts[['aneuploidy_bycancer']] + 
+        ylab('Spearman Correlation Coeff.') + 
+        theme_pubr(base_size = FONT_SIZE) +
+        theme(plot.margin = margin(0,0,0,0, "cm")),
+    plts[['aneuploidy_pancancer']] + 
+        theme_pubr(base_size = FONT_SIZE) +
+        theme(plot.margin = margin(0,0,0,0, "cm")),
+    widths = c(1.15,0.13),
+    common.legend = TRUE
+) %>% annotate_figure(bottom = text_grob('Cancer Type', 
+                                         size = FONT_SIZE, 
+                                         family = FONT_FAMILY,
+                                         vjust = -0.75)
+                     ) +
+    theme(plot.margin = margin(0.1,0.3,0.1,0.1, "cm"))
+
 # prepare figure data
 common_cols = intersect(colnames(df), colnames(df_pancan))
 figdata = rbind(df[,common_cols], df_pancan[,common_cols]) %>% 
@@ -118,7 +142,8 @@ figdata = rbind(df[,common_cols], df_pancan[,common_cols]) %>%
 
 # save
 ## plots
-saveRDS(plts, output_file)
+ggsave(plt, filename=output_file, units = 'cm', width=12, dpi=300, height=8, device=cairo_pdf)
+
 ## figure data
 write_xlsx(
     x = list(correlation_aneuploidy = figdata),

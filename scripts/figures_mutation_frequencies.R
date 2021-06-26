@@ -20,6 +20,7 @@ require(ggrepel)
 require(latex2exp)
 require(gtools)
 require(writexl)
+require(patchwork)
 
 # variables
 ROOT = here::here()
@@ -33,11 +34,16 @@ WIDTH = 7.5
 HEIGHT = 4
 BASE_SIZE = 10
 
+FONT_SIZE = 7 # pt
+FONT_FAMILY = 'helvetica'
+FIG_LETTER_FONT_SIZE = 9 # pt
+FIG_LETTER_FONT_FACE = 'bold'
+
 # inputs
 snv_counts_file = file.path(PREP_DIR,'snv_gene_freq.tsv')
 
 # outputs
-output_file = file.path(RESULTS_DIR,'figures','mutation_frequency.rds')
+output_file = file.path(RESULTS_DIR,'figures','mutation_frequency.pdf')
 output_figdata = file.path(RESULTS_DIR,'files','figdata-mutation_frequency.xlsx')
 
 
@@ -115,17 +121,47 @@ for (eff in unique(df$effect)){
         mutate(z_score=as.numeric(scale(log10(freq_per_kb))),
                pvalue=pnorm(-abs(z_score)))
     df_pancancer$cancer_type = 'PANCAN'
-    plt_pancancer = make_plot_bycancer(df_pancancer %>% filter(effect==eff), is_pancan = TRUE)
-    
-    # combine
-    #plt = ggarrange(plt_bycancer, plt_pancancer, ncol=2, widths=c(1.5,0.3))
-    #plt = annotate_figure(plt,
-    #                      top = paste('Gene Mutation Frequency per Kb -',eff),
-    #                      left = text_grob(TeX('Normalized $log_{10}$(Mut. Freq.)'), rot = 90),
-    #                      bottom = 'Cancer Type')
-    
+    plt_pancancer = make_plot_bycancer(df_pancancer %>% filter(effect==eff), is_pancan = TRUE)    
     plts[[plt_name]] = list(bycancer=plt_bycancer, pancancer=plt_pancancer)
 }
+
+# prepare figure
+widths_cancer_type = c(1.15,0.13)
+
+plt_names_oi = c('Missense_Mutation','Nonsense_Mutation','3\'UTR','Splice_Site','Frame_Shift_Del')
+plt_names_oi = paste0('effect_by_cancer-',plt_names_oi)
+mutations = sapply(plt_names_oi, function(plt_name){
+    plt = plts[[plt_name]]
+    plt = ggarrange(
+        plt[['bycancer']] + 
+            labs(y = TeX('Normalized $log_{10}$(Mut. Freq.)')) +
+            ggtitle(gsub('effect_by_cancer-','',plt_name)) +
+            theme_pubr(base_size = FONT_SIZE) +
+            theme(plot.margin = margin(0,0,0,0, "cm")),
+        plt[['pancancer']] + 
+            theme_pubr(base_size = FONT_SIZE) +
+            theme(plot.margin = margin(0,0,0,0, "cm")),
+        widths = widths_cancer_type,
+        common.legend = TRUE,
+        ncol = 2
+    ) %>% annotate_figure(bottom = text_grob('Cancer Type', 
+                                             size = FONT_SIZE, 
+                                             family = FONT_FAMILY,
+                                             vjust = -0.75)
+                          ) +
+    theme(plot.margin = margin(0.1,0.1,0.1,0.1, "cm"))
+    
+    return(plt)
+}, simplify=FALSE)
+
+fig = wrap_plots(mutations, ncol=1) + 
+    plot_annotation(tag_levels = 'A') & 
+    theme(
+        plot.tag = element_text(
+            size=FIG_LETTER_FONT_SIZE,
+            face=FIG_LETTER_FONT_FACE,
+            family=FONT_FAMILY)
+    )
 
 # prepare figure data
 df_pancan = df %>% 
@@ -140,7 +176,8 @@ common_cols = intersect(colnames(df),colnames(df_pancan))
 figdata = rbind(df[,common_cols], df_pancan[,common_cols])
 
 # save plots
-saveRDS(plts, output_file)
+ggsave(output_file, fig, width = 12, height = 6*length(mutations), units = 'cm', dpi = 300, device = cairo_pdf)
+
 ## figure data
 write_xlsx(
     x = list(mutation_frequency = figdata),

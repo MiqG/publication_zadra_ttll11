@@ -44,7 +44,7 @@ rule all:
         '.done/prep-sample_phenotype.done',
         '.done/prep-aneuploidy.done',
         '.done/prep-snv.done',
-        '.done/prep-genexpr_TTLL11.done',
+        '.done/prep-genexpr_TTLLs.done',
         '.done/prep-gtex.done',
         
         # expression of TTLL11 and TTLL13 in tissues
@@ -203,16 +203,16 @@ rule prep_snv:
         """
 
         
-rule prep_genexpr_TTLL11:
+rule prep_genexpr_TTLLs:
     input:
         genexpr = os.path.join(XENA_DIR,'TCGA','rnaseq','AdjustPANCAN_IlluminaHiSeq_RNASeqV2.geneExp.xena.gz'),
         sample_phenotype = os.path.join(PREP_DIR,'sample_phenotype.tsv')
     output:
-        touch('.done/prep-genexpr_TTLL11.done'),
-        os.path.join(PREP_DIR,'genexpr_TTLL11.tsv')
+        touch('.done/prep-genexpr_TTLLs.done'),
+        os.path.join(PREP_DIR,'genexpr_TTLLs.tsv')
     shell:
         """
-        Rscript scripts/prep_TTLL11_expression.R
+        Rscript scripts/prep_TTLLs_expression.R
         """
 
 rule prep_gtex:
@@ -240,16 +240,17 @@ rule gtex_genexpr:
         Rscript scripts/figures_gtex_expression.R
         """
         
-##### 3. Differential expression of TTLL11 across cancer types #####
-rule diffexpr_TTLL11:
+##### 3. Differential expression of TTLLs across cancer types #####
+rule diffexpr_TTLLs:
     input:
-        genexpr = os.path.join(PREP_DIR,'genexpr_TTLL11.tsv'),
+        genexpr = os.path.join(PREP_DIR,'genexpr_TTLLs.tsv'),
     output:
-        figure = os.path.join(RESULTS_DIR,'figures','differential_expression.pdf'),
+        figures = [os.path.join(RESULTS_DIR,'figures','differential_expression.pdf'), 
+                   os.path.join(RESULTS_DIR,'figures','TTLLs-differential_gene_expression-barplot.pdf')],
         figdata = os.path.join(RESULTS_DIR,'files','figdata-differential_expression.xlsx')
     shell:
         """
-        Rscript scripts/figures_differential_genexpr.R
+        Rscript scripts/figures_differential_genexpr_TTLLs.R
         """
 
 ##### 4. Correlation between aneuploidy score and expression of TTLL11 #####

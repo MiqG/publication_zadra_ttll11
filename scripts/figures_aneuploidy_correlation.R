@@ -9,12 +9,9 @@
 #
 
 # libraries
-require(readr)
+require(tidyverse)
 require(ggpubr)
-require(dplyr)
-require(tidyr)
 require(reshape2)
-require(latex2exp)
 require(gtools)
 require(writexl)
 require(latex2exp)

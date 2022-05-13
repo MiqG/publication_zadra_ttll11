@@ -11,6 +11,7 @@ require(tidyverse)
 require(scattermore)
 require(ggpubr)
 require(ggrepel)
+require(cowplot)
 
 # variables
 ROOT = here::here()
@@ -21,7 +22,9 @@ RESULTS_DIR = file.path(ROOT,'results')
 genes_oi = c("ENSG00000175764")
 
 TEST_METHOD = 'wilcox.test'
-
+PAL_SAMPLE_TYPE = rev(get_palette("npg",2))
+FONT_SIZE = 7 # pt
+FONT_FAMILY = 'Helvetica'
 
 # inputs
 metadata_file = file.path(RAW_DIR,"GSE185512","metadata.tsv")
@@ -50,7 +53,8 @@ metadata = metadata %>% mutate(cell_line=gsub("RPE-1","RPE1",cell_line),
                                cell_line=gsub("RPE1 mutTP53","RPE1-mutTP53",cell_line),
                                cell_line=gsub("RPE1-mutTP53","RPE1TP53mut",cell_line),
                                cell_line=gsub("MDA-MB231","MDAMB231",cell_line),
-                               cell_line_simple=gsub("-.*","",cell_line))
+                               cell_line_simple=gsub("-.*","",cell_line),
+                               condition = gsub(".*-","",cell_line))
 dge_oe = dge_oe %>% mutate(cell_line=gsub("\\|.*","",subset_values))
 dge_t = dge_t %>% mutate(cell_line=gsub("\\|.*","",subset_values))
 
@@ -69,12 +73,12 @@ genexpr = counts %>%
 
 genexpr_oi = genexpr %>%
     filter(gene %in% genes_oi) %>%
-    left_join(metadata %>% distinct(sampleID,cell_line,cell_line_simple,treatment,timepoint,replicate), 
+    left_join(metadata %>% distinct(sampleID,cell_line,cell_line_simple,treatment,timepoint,replicate, condition), 
               by="sampleID") %>%
     arrange(cell_line)
 
 genexpr_ctls = genexpr_oi %>%
-    filter(str_detect(cell_line,"Empty")) %>%
+    filter(condition == "Empty") %>%
     group_by(cell_line_simple, timepoint, treatment) %>%
     summarize(avg_ctl = mean(log2tpm, na.rm=TRUE)) %>%
     ungroup()
@@ -119,7 +123,7 @@ plts[["genexpr-eda-oe-norm"]] = genexpr_oi %>%
     filter(treatment!="Hydroxyurea") %>%
     mutate(treatment = factor(treatment, levels=c("NO Dox","Doxycycline"))) %>%
     ggboxplot(x="cell_line", y="norm_log2tpm", fill="treatment", 
-              palette=rev(get_palette("npg",2)), outlier.size=0.1) + 
+              palette=PAL_SAMPLE_TYPE, outlier.size=0.1) + 
     stat_compare_means(aes(group = treatment), 
                        method=TEST_METHOD, label = "p.signif") + 
     theme_pubr(x.text.angle = 75) +
@@ -127,6 +131,21 @@ plts[["genexpr-eda-oe-norm"]] = genexpr_oi %>%
     theme(strip.text.x = element_text(size=6)) +
     geom_hline(yintercept=0, linetype="dashed", size=0.2) +
     labs(x="Cell Line", y="log2(TPM + 1) w.r.t. Empty", title=genes_oi)
+
+plts[["genexpr-eda-oe-norm-aggregated"]] = genexpr_oi %>% 
+    filter(treatment!="Hydroxyurea" & cell_line_simple!="RPE1TP53mut") %>%
+    mutate(treatment = factor(treatment, levels=c("NO Dox","Doxycycline")),
+           condition = factor(condition, levels=c("Cdc25a", "CyclinE", "Myc", "Empty"))) %>%
+    ggboxplot(x="treatment", y="norm_log2tpm", outlier.shape=NA, width=0.4,
+              fill=NA, color="treatment", palette=PAL_SAMPLE_TYPE) + 
+    geom_jitter(aes(shape=cell_line_simple), width=0.1, size=1) +
+    stat_compare_means(method=TEST_METHOD, size=2, family=FONT_FAMILY) + 
+    theme_pubr(x.text.angle = 75) +
+    facet_wrap(~condition, nrow=2) +
+    theme(strip.text.x = element_text(size=6), aspect.ratio=1) +
+    geom_hline(yintercept=0, linetype="dashed", size=0.2) +
+    guides(color="none") +
+    labs(x="Treatment", y="log2(TPM + 1) w.r.t. Empty", shape="Cell Line", title=genes_oi)
 
 plts[["genexpr-eda-t-norm"]] = genexpr_oi %>% 
     filter(treatment=="Doxycycline") %>%
@@ -143,6 +162,28 @@ plts[["genexpr-eda-t-norm"]] = genexpr_oi %>%
     labs(x="Cell Line", y="log2(TPM + 1) w.r.t. Empty", title=genes_oi)
 
 # effect of p53 mutation
+X = genexpr_oi %>%
+    filter(cell_line_simple%in%c("RPE1","RPE1TP53mut") & 
+           condition=="Empty" &
+           treatment!="Hydroxyurea") %>%
+    mutate(cell = "RPE1")
+
+genexpr_ctls = X %>%
+    filter(cell_line_simple == "RPE1") %>%
+    distinct(cell_line_simple, treatment, timepoint, avg_ctl) %>%
+    dplyr::rename(cell=cell_line_simple)
+
+X = X %>%
+    dplyr::select(-c(avg_ctl, norm_log2tpm)) %>%
+    left_join(genexpr_ctls, by=c("treatment", "timepoint", "cell")) %>%
+    mutate(norm_log2tpm = log2tpm - avg_ctl)
+
+plts[["genexpr-mut-rpe1-norm"]] =  X %>%
+    ggboxplot(x="cell_line_simple", y="norm_log2tpm",
+              fill="cell_line_simple", palette=PAL_SAMPLE_TYPE) +
+    stat_compare_means(method=TEST_METHOD, label="p.signif")
+    
+
 df = dge_mut
 plts[["dge-volcano-fc_vs_pvalue-mut"]] = df %>% 
     ggplot(aes(x=log2FoldChange, y=(-log10_pvalue))) + 
@@ -220,6 +261,20 @@ plts[["dge-volcano-fc_vs_padj-oe"]] = df %>%
     
 
 # save
+save_plt = function(plts, plt_name, extension='.pdf', 
+                    directory='', dpi=350, format=TRUE,
+                    width = par("din")[1], height = par("din")[2]){
+    print(plt_name)
+    plt = plts[[plt_name]]
+    if (format){
+        plt = ggpar(plt, font.title=8, font.subtitle=8, font.caption=8, 
+                    font.x=8, font.y=8, font.legend=6,
+                    font.tickslab=6, font.family=FONT_FAMILY)   
+    }
+    filename = file.path(directory,paste0(plt_name,extension))
+    save_plot(filename, plt, base_width=width, base_height=height, dpi=dpi, units='cm', device=cairo_pdf)
+}
+
 dir.create(output_figdir, recursive=TRUE)
 
 plt_name = "metadata-eda"
@@ -233,6 +288,8 @@ ggsave(sprintf(file.path(output_figdir,"%s.pdf"), plt_name), plts[[plt_name]], u
 
 plt_name = "genexpr-eda-oe-norm"
 ggsave(sprintf(file.path(output_figdir,"%s.pdf"), plt_name), plts[[plt_name]], units = 'cm', width = 12, height = 12)
+
+save_plt(plts, "genexpr-eda-oe-norm-aggregated", ".pdf", output_figdir, width=12, height=15)
 
 plt_name = "genexpr-eda-t-norm"
 ggsave(sprintf(file.path(output_figdir,"%s.pdf"), plt_name), plts[[plt_name]], units = 'cm', width = 12, height = 13)

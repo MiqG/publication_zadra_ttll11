@@ -2,7 +2,7 @@
 
 This repository contains all the scripts to perform the bioinformatic data analyses in Zadra *et al.* XXXX (DOI: XXXX).
 
-## Description
+## Overview
 The scripts carry out the following steps:
 0. Download data
 1. Preprocess data:
@@ -11,6 +11,10 @@ The scripts carry out the following steps:
 4. Correlation between aneuploidy score and expression of TTLL11 across cancer types.
 5. Mutation frequency per kilobase of every gene in primary tumors.
 6. Prepare publishable figures
+
+## Analysis
+- [ ] coexpression enrichment of transcription factors [CHEA harmonizome](https://maayanlab.cloud/Harmonizome/dataset/CHEA+Transcription+Factor+Targets) for all TTLLs
+- [ ] Do we see the same causality of the overexpressed genes with clear direction in cancers?
 
 ## Requirements
 In brackets, the version used in this project.

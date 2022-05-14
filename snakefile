@@ -76,6 +76,7 @@ rule all:
         '.done/UCSCXena-TCGA-PANCAN.done', # gene expression in tumors
         '.done/Taylor2018.done', # TCGA aneuploidy
         '.done/GSE185512.done',
+        '.done/CHEA_TFs.done',
         
         # preprocess data
         '.done/prep-sample_phenotype.done',
@@ -226,6 +227,24 @@ rule download_GSE185512:
         """
         Rscript scripts/download_GSE185512.R
         """
+        
+        
+rule download_harmonizome_gene_sets:
+    params:
+        chea = "https://maayanlab.cloud/static/hdfs/harmonizome/data/cheappi/gene_set_library_crisp.gmt.gz"
+    output:
+        touch('.done/CHEA_TFs.done'),
+        chea = os.path.join(RAW_DIR,"Harmonizome","CHEA-TranscriptionFactorTargets.gmt.gz"),
+        readme = os.path.join(RAW_DIR,'Harmonizome','README.md')
+    shell:
+        """
+        # aneuploidy
+        wget --user-agent="Chrome" --no-clobber --no-check-certificate {params.chea} -O {output.chea}        
+        # readme
+        echo "Downloaded on $(date)." > {output.readme}
+        
+        echo Done!
+        """ 
         
         
 ##### 1. Preprocess data #####

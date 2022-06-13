@@ -125,10 +125,14 @@ enrichments[["GO"]] = get_enrichment_result(enrichments[["GO"]]) %>%
     mutate(Count = str_count(core_enrichment, "/")+1, 
            GeneRatio=Count/setSize)
 
-plts[["coexpression_tcga-TTLLs_vs_all-go_enrichment_dotplot-lowNES"]] = enrichments[["GO"]] %>% 
+terms_oi = enrichments[["GO"]] %>% 
     group_by(Cluster) %>%
     slice_min(NES, n=5) %>%
     ungroup() %>%
+    pull(Description) %>%
+    unique()
+plts[["coexpression_tcga-TTLLs_vs_all-go_enrichment_dotplot-lowNES"]] = enrichments[["GO"]] %>% 
+    filter(Description %in% terms_oi) %>%
     arrange(desc(Cluster), Description) %>%
     mutate(Description = factor(Description, levels=unique(Description))) %>%
     ggscatter(x="Cluster", y="Description", size="GeneRatio", color="p.adjust") +
@@ -138,10 +142,14 @@ plts[["coexpression_tcga-TTLLs_vs_all-go_enrichment_dotplot-lowNES"]] = enrichme
         name="FDR", guide=guide_colorbar(reverse=TRUE)) +
     theme_pubr(x.text.angle = 70)
 
-plts[["coexpression_tcga-TTLLs_vs_all-go_enrichment_dotplot-highNES"]] = enrichments[["GO"]] %>% 
+terms_oi = enrichments[["GO"]] %>% 
     group_by(Cluster) %>%
     slice_max(NES, n=5) %>%
     ungroup() %>%
+    pull(Description) %>%
+    unique()
+plts[["coexpression_tcga-TTLLs_vs_all-go_enrichment_dotplot-highNES"]] = enrichments[["GO"]] %>% 
+    filter(Description %in% terms_oi) %>%
     arrange(desc(Cluster), Description) %>%
     mutate(Description = factor(Description, levels=unique(Description))) %>%
     ggscatter(x="Cluster", y="Description", size="GeneRatio", color="p.adjust") +
@@ -165,10 +173,14 @@ enrichments[["tf_targets"]] = get_enrichment_result(enrichments[["tf_targets"]])
     mutate(Count = str_count(core_enrichment, "/")+1, 
            GeneRatio=Count/setSize)
 
-plts[["coexpression_tcga-TTLLs_vs_all-tf_targets_enrichment_dotplot-highNES"]] = enrichments[["tf_targets"]] %>% 
+terms_oi = enrichments[["tf_targets"]] %>% 
     group_by(Cluster) %>%
-    slice_max(NES, n=5) %>% # positively coexpressed should be co-regulated
+    slice_max(NES, n=5) %>%
     ungroup() %>%
+    pull(Description) %>%
+    unique()
+plts[["coexpression_tcga-TTLLs_vs_all-tf_targets_enrichment_dotplot-highNES"]] = enrichments[["tf_targets"]] %>% 
+    filter(Description %in% terms_oi) %>%
     arrange(desc(Cluster), Description) %>%
     mutate(Description = factor(Description, levels=unique(Description))) %>%
     ggscatter(x="Cluster", y="Description", size="GeneRatio", color="p.adjust") +
@@ -177,7 +189,6 @@ plts[["coexpression_tcga-TTLLs_vs_all-tf_targets_enrichment_dotplot-highNES"]] =
         low=PAL_FDR_LIGHT, high=PAL_FDR_DARK, 
         name="FDR", guide=guide_colorbar(reverse=TRUE)) +
     theme_pubr(x.text.angle = 70)
-
 
 # save
 save_plt = function(plts, plt_name, extension='.pdf', 

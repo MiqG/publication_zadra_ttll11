@@ -13,7 +13,7 @@ require(ggpubr)
 require(writexl)
 require(latex2exp)
 require(scattermore)
-
+require(extrafont)
 
 ROOT = here::here()
 DATA_DIR = file.path(ROOT,'data')
@@ -36,7 +36,7 @@ TEST_METHOD = 'wilcox.test'
 # formatting
 PAL_SAMPLE_TYPE = rev(get_palette("npg",2))
 FONT_SIZE = 7 # pt
-FONT_FAMILY = 'helvetica'
+FONT_FAMILY = 'Arial'
 
 # inputs
 genexpr_ttlls_file = file.path(PREP_DIR,'genexpr_TTLLs.tsv')
@@ -52,7 +52,7 @@ genexpr = read_tsv(genexpr_file)
 metadata = read_tsv(phenotype_file)
 
 # select genes of interest and prepare
-X = df %>% 
+X = genexpr %>% 
     filter(sample %in% c("CCNE1","CDC25A")) %>%
     column_to_rownames("sample") %>% 
     t() %>%
@@ -187,7 +187,7 @@ plts[["differential_expression_by_status-TTLL11"]] = df %>%
     theme(strip.text.x = element_text(size=6, family=FONT_FAMILY),
           strip.background = element_rect(fill="transparent")) +
     stat_compare_means(aes(label=..p.signif..),
-                       method=TEST_METHOD, ref.group="STN", size=2) + 
+                       method=TEST_METHOD, ref.group="STN", size=2, family=FONT_FAMILY) + 
     labs(x="Oncogene Status", y=TeX('$log_2(Norm. Count + 1)$'), fill="Sample Type")
 
 # save
@@ -202,10 +202,12 @@ save_plt = function(plts, plt_name, extension='.pdf',
                     font.tickslab=6, font.family=FONT_FAMILY)   
     }
     filename = file.path(directory,paste0(plt_name,extension))
-    save_plot(filename, plt, base_width=width, base_height=height, dpi=dpi, units='cm', device=cairo_pdf)
+    save_plot(filename, plt, base_width=width, base_height=height, dpi=dpi, units='cm')
 }
 
 ## plots
 dir.create(figs_dir, recursive=TRUE)
 save_plt(plts, "coexpression_cyclinE_cdc25", ".pdf", figs_dir, width=12, height=12)
 save_plt(plts, "differential_expression_by_status-TTLL11", ".pdf", figs_dir, width=12, height=15)
+
+print("Done!")

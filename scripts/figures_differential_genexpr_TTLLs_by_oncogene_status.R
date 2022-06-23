@@ -26,15 +26,18 @@ CANCERS_OI = c('LUSC','UCEC','BRCA','STAD','LUAD','KIRP',
                'THCA','KICH','COAD','LIHC','HNSC','PRAD','KIRC')
 SAMPLE_TYPES_OI = c('Solid Tissue Normal','Primary Tumor')
 
-THRESH_LOW_CYCLIN = 5
-THRESH_HIGH_CYCLIN = 10
-THRESH_LOW_CDC25 = 3.5
-THRESH_HIGH_CDC25 = 8.5
+THRESH_LOW = 0.10
+THRESH_HIGH = 0.90
+
+# THRESH_LOW_CYCLIN = 5
+# THRESH_HIGH_CYCLIN = 10
+# THRESH_LOW_CDC25 = 3.5
+# THRESH_HIGH_CDC25 = 8.5
 
 TEST_METHOD = 'wilcox.test'
 
 # formatting
-PAL_SAMPLE_TYPE = rev(get_palette("npg",2))
+PAL_SAMPLE_TYPE = setNames(get_palette("npg",2), c("Primary Tumor", "Solid Tissue Normal"))
 FONT_SIZE = 7 # pt
 FONT_FAMILY = 'Arial'
 
@@ -66,34 +69,38 @@ X = genexpr %>%
 plts = list()
 
 ##### How does the expression of CyclinE and Cdc25 change across cancer types? #####
-plts[["coexpression_cyclinE_cdc25"]] = X %>% 
-    filter(sample_type=="Primary Tumor") %>%
-    ggplot(aes(x=CCNE1, y=CDC25A)) + 
-    geom_scattermore(pixels=c(1000,1000), pointsize=6, alpha=0.5) + 
-    geom_hline(yintercept=c(THRESH_HIGH_CDC25, THRESH_LOW_CDC25), linetype="dashed", size=0.1) +
-    geom_vline(xintercept=c(THRESH_HIGH_CYCLIN, THRESH_LOW_CYCLIN), linetype="dashed", size=0.1) +
-    stat_cor(method="spearman", size=2, family=FONT_FAMILY) +
-    facet_wrap(~cancer_type) + 
-    theme(strip.text.x = element_text(size=6, family=FONT_FAMILY)) +
-    labs(x=TeX('$log_2(Norm. CountCCNE1 + 1)$'), y=TeX('$log_2(Norm. CountCDC25A + 1)$')) +
-    theme_pubr()
-
 # classify samples based on high or low expression of the genes
 X = X %>%
+    group_by(cancer_type) %>%
     mutate(
         status_cyclin = case_when(
-            CCNE1 < THRESH_LOW_CYCLIN ~ "low_cyclin",
-            CCNE1 > THRESH_HIGH_CYCLIN ~ "high_cyclin",
-            CCNE1 >= THRESH_LOW_CYCLIN & CCNE1 <= THRESH_HIGH_CYCLIN ~ "regular_cyclin"
+            CCNE1 < quantile(CCNE1, THRESH_LOW) ~ "low_cyclin",
+            CCNE1 > quantile(CCNE1, THRESH_HIGH) ~ "high_cyclin",
+            CCNE1 >= quantile(CCNE1, THRESH_LOW) & CCNE1 <= quantile(CCNE1, THRESH_HIGH) ~ "regular_cyclin"
         ),
         status_cdc25 = case_when(
-            CDC25A < THRESH_LOW_CDC25 ~ "low_cdc25",
-            CDC25A > THRESH_HIGH_CDC25 ~ "high_cdc25",
-            CDC25A >= THRESH_LOW_CDC25 & CDC25A <= THRESH_HIGH_CDC25 ~ "regular_cdc25"
+            CDC25A < quantile(CDC25A, THRESH_LOW) ~ "low_cdc25",
+            CDC25A > quantile(CDC25A, THRESH_HIGH) ~ "high_cdc25",
+            CDC25A >= quantile(CDC25A, THRESH_LOW) & CDC25A <= quantile(CDC25A, THRESH_HIGH) ~ "regular_cdc25"
         ),
         status_combined = paste0(status_cyclin, " & ", status_cdc25),
         status_combined = ifelse(sample_type == "Solid Tissue Normal", "STN", status_combined)
-    )
+    ) %>%
+    ungroup()
+
+# viz
+plts[["coexpression_cyclinE_cdc25"]] = X %>% 
+    filter(sample_type=="Primary Tumor") %>%
+    ggplot(aes(x=CCNE1, y=CDC25A)) + 
+    geom_scattermore(aes(color=status_combined), 
+                     pixels=c(1000,1000), pointsize=6, alpha=0.5) + 
+    color_palette("Paired") +
+    stat_cor(method="spearman", size=2, family=FONT_FAMILY) +
+    theme_pubr() +
+    facet_wrap(~cancer_type, scales="free") + 
+    theme(strip.text.x = element_text(size=6, family=FONT_FAMILY),
+          aspect.ratio = 1) +
+    labs(x=TeX('$log_2(Norm. CountCCNE1 + 1)$'), y=TeX('$log_2(Norm. CountCDC25A + 1)$'))
 
 ##### Run Differential analysis for all TTLLs across cancers considering oncogenes status #####
 # which cancers have enough samples?
@@ -172,6 +179,7 @@ status_order = c(
     'high_cyclin & regular_cdc25',
     'regular_cyclin & high_cdc25',
     'low_cyclin & regular_cdc25',
+    'regular_cyclin & low_cdc25',
     'low_cyclin & low_cdc25'
 )
 
@@ -185,7 +193,7 @@ plts[["differential_expression_by_status-TTLL11"]] = df %>%
     theme_pubr(x.text.angle = 70) +
     facet_wrap(~cancer_type) +
     theme(strip.text.x = element_text(size=6, family=FONT_FAMILY),
-          strip.background = element_rect(fill="transparent")) +
+          aspect.ratio = 1) +
     stat_compare_means(aes(label=..p.signif..),
                        method=TEST_METHOD, ref.group="STN", size=2, family=FONT_FAMILY) + 
     labs(x="Oncogene Status", y=TeX('$log_2(Norm. Count + 1)$'), fill="Sample Type")
@@ -207,7 +215,7 @@ save_plt = function(plts, plt_name, extension='.pdf',
 
 ## plots
 dir.create(figs_dir, recursive=TRUE)
-save_plt(plts, "coexpression_cyclinE_cdc25", ".pdf", figs_dir, width=12, height=12)
+save_plt(plts, "coexpression_cyclinE_cdc25", ".pdf", figs_dir, width=12, height=15)
 save_plt(plts, "differential_expression_by_status-TTLL11", ".pdf", figs_dir, width=12, height=15)
 
 print("Done!")

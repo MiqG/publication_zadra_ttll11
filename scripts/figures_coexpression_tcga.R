@@ -372,34 +372,35 @@ plts[["coexpression_tcga-TTLLs_vs_all-go_enrichment-pt_vs_stn_diff"]] = X %>%
 
 #### which gene sets contain drivers of lowering TTLL11
 x = X %>% 
-    filter(NES_diff<(-1) & Cluster=="TTLL11") %>% # 103 gene sets
+    filter(Cluster=="TTLL11") %>% # 519 gene sets
     filter(
         str_detect(string=core_enrichment_stn, pattern=paste(REGULATORS, collapse="|")) | 
         str_detect(string=core_enrichment_pt, pattern=paste(REGULATORS, collapse="|"))
-    ) %>%
+    ) %>% # 19 gene sets
     rowwise() %>%
     mutate(
         matches_stn = paste(intersect(REGULATORS, unlist(strsplit(core_enrichment_stn, "/"))), 
                             collapse=";"),
         matches_pt = paste(intersect(REGULATORS, unlist(strsplit(core_enrichment_pt, "/"))), 
-                           collapse=";")
+                           collapse=";"),
+        is_deregulated = NES_diff < (-1)
     ) %>%
     ungroup() # 19 gene sets
-# 19 out of 103 differential gene sets contain regulators
+# 19 out of 19 differential gene sets contain regulators
 # only PT samples contain regulators as core enrichment
 
 plts[["coexpression_tcga-TTLLs_vs_all-go_enrichment-regulators_enriched"]] = x %>%
     separate_rows(matches_stn, matches_pt) %>%
-    distinct(Description, matches_stn, matches_pt) %>%
-    pivot_longer(-Description, names_to="sample_type", values_to="regulators") %>%
+    distinct(Description, matches_stn, matches_pt, is_deregulated) %>%
+    pivot_longer(-c(Description, is_deregulated), names_to="sample_type", values_to="regulators") %>%
     mutate(regulators = ifelse(regulators == "", NA, regulators)) %>%
     drop_na(regulators) %>%
-    count(sample_type, regulators, Description) %>%
+    distinct() %>%
+    count(sample_type, regulators, is_deregulated, Description) %>%
     ggbarplot(x="regulators", y="n", fill="Description", palette=get_palette("Paired",19), color=NA) +
-    facet_wrap(~sample_type) +
-    theme(strip.text.x = element_text(size=6, family=FONT_FAMILY)) +
+    facet_wrap(~sample_type + is_deregulated) +
+    theme(strip.text.x = element_text(size=6, family=FONT_FAMILY)) + 
     labs(x="Regulator TTLL11", y="Count in Gene Sets")
-
 
 ### CHEA TFs
 X = enrichments[["STN"]][["tf_targets"]] %>%
@@ -440,31 +441,33 @@ plts[["coexpression_tcga-TTLLs_vs_all-tf_targets_enrichment-pt_vs_stn_diff"]] = 
 
 #### which gene sets contain drivers of lowering TTLL11
 x = X %>% 
-    filter(NES_diff<(-1) & Cluster=="TTLL11") %>% # 3 gene sets
+    filter(Cluster=="TTLL11") %>% # 38 gene sets
     filter(
         str_detect(string=core_enrichment_stn, pattern=paste(REGULATORS, collapse="|")) | 
         str_detect(string=core_enrichment_pt, pattern=paste(REGULATORS, collapse="|"))
-    ) %>%
+    ) %>% # 6 gene sets
     rowwise() %>%
     mutate(
         matches_stn = paste(intersect(REGULATORS, unlist(strsplit(core_enrichment_stn, "/"))), 
                             collapse=";"),
         matches_pt = paste(intersect(REGULATORS, unlist(strsplit(core_enrichment_pt, "/"))), 
-                           collapse=";")
+                           collapse=";"),
+        is_deregulated = NES_diff < (-1)
     ) %>%
-    ungroup() # 3 gene sets
-# 3 out of 3 differential gene sets contain regulators
+    ungroup() # 6 gene sets
+# 3 out of 6 differential gene sets contain regulators
 # only PT samples contain regulators as core enrichment
 
 plts[["coexpression_tcga-TTLLs_vs_all-tf_targets_enrichment-regulators_enriched"]] = x %>%
     separate_rows(matches_stn, matches_pt) %>%
-    distinct(Description, matches_stn, matches_pt) %>%
-    pivot_longer(-Description, names_to="sample_type", values_to="regulators") %>%
+    distinct(Description, matches_stn, matches_pt, is_deregulated) %>%
+    pivot_longer(-c(Description, is_deregulated), names_to="sample_type", values_to="regulators") %>%
     mutate(regulators = ifelse(regulators == "", NA, regulators)) %>%
     drop_na(regulators) %>%
-    count(sample_type, regulators, Description) %>%
-    ggbarplot(x="regulators", y="n", fill="Description", palette=get_palette("Dark2",3), color=NA) +
-    facet_wrap(~sample_type) +
+    distinct() %>%
+    count(sample_type, regulators, is_deregulated, Description) %>%
+    ggbarplot(x="regulators", y="n", fill="Description", palette=get_palette("Dark2",6), color=NA) +
+    facet_wrap(~sample_type + is_deregulated) +
     theme(strip.text.x = element_text(size=6, family=FONT_FAMILY)) + 
     labs(x="Regulator TTLL11", y="Count in Gene Sets")
 
@@ -513,8 +516,8 @@ save_plt(plts, "coexpression_tcga-TTLLs_vs_all-tf_targets_enrichment-pt_vs_stn",
 save_plt(plts, "coexpression_tcga-TTLLs_vs_all-tf_targets_enrichment-pt_vs_stn_diff", ".pdf", figs_dir, width=8, height=10)
 
 # TTLL11 regulators in differentially enriched coexpression gene sets
-save_plt(plts, 'coexpression_tcga-TTLLs_vs_all-go_enrichment-regulators_enriched', ".pdf", figs_dir, width=4, height=8)
-save_plt(plts, 'coexpression_tcga-TTLLs_vs_all-tf_targets_enrichment-regulators_enriched', ".pdf", figs_dir, width=4, height=6)
+save_plt(plts, 'coexpression_tcga-TTLLs_vs_all-go_enrichment-regulators_enriched', ".pdf", figs_dir, width=3, height=8)
+save_plt(plts, 'coexpression_tcga-TTLLs_vs_all-tf_targets_enrichment-regulators_enriched', ".pdf", figs_dir, width=7, height=6)
 
 save_plt(plts, "coexpression_tcga-TTLLs_vs_all-regulators", ".pdf", figs_dir, width=5, height=5)
 

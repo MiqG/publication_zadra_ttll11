@@ -22,6 +22,7 @@ ORDER_OI = c('LUSC','UCEC','BRCA','STAD','LUAD','KIRP',
 TEST_METHOD = "wilcox.test"
 GENE_OI = "TTLL11"
 GENES_OI = c('TTLL1', 'TTLL2', 'TTLL4', 'TTLL5', 'TTLL6', 'TTLL7', 'TTLL9', 'TTLL11', 'TTLL13')
+REGULATORS = c("CDC25A","CCNE1")
 
 # formatting
 FONT_SIZE = 7 # pt
@@ -70,6 +71,8 @@ corrs = lapply(c("Primary Tumor","Solid Tissue Normal"), function(sample_type_oi
         pivot_longer(-symbol, names_to="gene", values_to="correlation") %>% 
         filter(symbol != gene) %>% # do not consider self-correlations
         mutate(sample_type=sample_type_oi)
+    
+    gc()
     
     return(corr)
 })
@@ -155,26 +158,31 @@ query = sapply(GENES_OI, function(gene_oi){
 
 ### GO
 enrichments[["PT"]][["GO"]] = sapply(GENES_OI, function(gene_oi){
-    gseGO(query[[gene_oi]], ont="BP", OrgDb=ORGDB, keyType="SYMBOL")
+    res = gseGO(query[[gene_oi]], ont="BP", OrgDb=ORGDB, keyType="SYMBOL")
+    gc()
+    return(res)
 }, simplify=FALSE)
 enrichments[["PT"]][["GO"]] = get_enrichment_result(enrichments[["PT"]][["GO"]]) %>%
     mutate(Count = str_count(core_enrichment, "/")+1, 
            GeneRatio=Count/setSize)
+gc()
 
 ### CHEA TF targets
 enrichments[["PT"]][["tf_targets"]] = sapply(GENES_OI, function(gene_oi){
-    GSEA(
+    res = GSEA(
         query[[gene_oi]], maxGSSize=1e4, 
         TERM2GENE=ontologies[["tf_targets"]] %>% 
             group_by(term) %>% 
             filter(any(gene %in% GENES_OI)) %>%
             ungroup()
     )
+    gc()
+    return(res)
 }, simplify=FALSE)
 enrichments[["PT"]][["tf_targets"]] = get_enrichment_result(enrichments[["PT"]][["tf_targets"]]) %>%
     mutate(Count = str_count(core_enrichment, "/")+1, 
            GeneRatio=Count/setSize)
-
+gc()
 
 ## Solid Tissue Normal
 X = corrs %>% filter(sample_type=="Solid Tissue Normal")
@@ -188,26 +196,31 @@ query = sapply(GENES_OI, function(gene_oi){
 
 ### GO
 enrichments[["STN"]][["GO"]] = sapply(GENES_OI, function(gene_oi){
-    gseGO(query[[gene_oi]], ont="BP", OrgDb=ORGDB, keyType="SYMBOL")
+    res = gseGO(query[[gene_oi]], ont="BP", OrgDb=ORGDB, keyType="SYMBOL")
+    gc()
+    return(res)
 }, simplify=FALSE)
 enrichments[["STN"]][["GO"]] = get_enrichment_result(enrichments[["STN"]][["GO"]]) %>%
     mutate(Count = str_count(core_enrichment, "/")+1, 
            GeneRatio=Count/setSize)
+gc()
 
 ### CHEA TF targets
 enrichments[["STN"]][["tf_targets"]] = sapply(GENES_OI, function(gene_oi){
-    GSEA(
+    res = GSEA(
         query[[gene_oi]], maxGSSize=1e4, 
         TERM2GENE=ontologies[["tf_targets"]] %>% 
             group_by(term) %>% 
             filter(any(gene %in% GENES_OI)) %>%
             ungroup()
     )
+    gc()
+    return(res)
 }, simplify=FALSE)
 enrichments[["STN"]][["tf_targets"]] = get_enrichment_result(enrichments[["STN"]][["tf_targets"]]) %>%
     mutate(Count = str_count(core_enrichment, "/")+1, 
            GeneRatio=Count/setSize)
-
+gc()
 
 # visualize enrichments
 ## Primary Tumor
@@ -322,13 +335,15 @@ plts[["coexpression_tcga-TTLLs_vs_all-tf_targets_enrichment_dotplot-highNES-stn"
 ## PT vs STN
 ### GO
 X = enrichments[["STN"]][["GO"]] %>%
-    distinct(Description, NES, Cluster) %>%
+    distinct(Description, NES, Cluster, GeneRatio, core_enrichment) %>%
     left_join(
         enrichments[["PT"]][["GO"]] %>%
-        distinct(Description, NES, Cluster),
+        distinct(Description, NES, Cluster, GeneRatio, core_enrichment),
         by = c("Description","Cluster"),
         suffix = c("_stn","_pt")
     ) %>%
+    mutate(NES_diff = NES_pt - NES_stn,
+           abs_NES_diff = abs(NES_diff)) %>%
     drop_na()
 
 plts[["coexpression_tcga-TTLLs_vs_all-go_enrichment-pt_vs_stn"]] = X %>%
@@ -340,16 +355,63 @@ plts[["coexpression_tcga-TTLLs_vs_all-go_enrichment-pt_vs_stn"]] = X %>%
     theme_pubr() +
     labs(x="NES Primary Tumor", y="NES Solid Tissue Normal")
 
+terms_oi = X %>% 
+    group_by(Cluster) %>%
+    slice_max(abs(NES_diff), n=5) %>%
+    ungroup() %>%
+    pull(Description) %>%
+    unique()
+plts[["coexpression_tcga-TTLLs_vs_all-go_enrichment-pt_vs_stn_diff"]] = X %>%
+    filter(Description %in% terms_oi) %>%
+    arrange(desc(Cluster), Description) %>%
+    mutate(Description = factor(Description, levels=unique(Description))) %>%
+    ggscatter(x="Cluster", y="Description", size="abs_NES_diff", color="NES_diff") +
+    scale_size("|Delta NES|", range=c(0.5,3)) + 
+    scale_color_continuous(low="darkgreen", high="orange", name="Delta NES") +
+    theme_pubr(x.text.angle = 70)
+
+#### which gene sets contain drivers of lowering TTLL11
+x = X %>% 
+    filter(NES_diff<(-1) & Cluster=="TTLL11") %>% # 103 gene sets
+    filter(
+        str_detect(string=core_enrichment_stn, pattern=paste(REGULATORS, collapse="|")) | 
+        str_detect(string=core_enrichment_pt, pattern=paste(REGULATORS, collapse="|"))
+    ) %>%
+    rowwise() %>%
+    mutate(
+        matches_stn = paste(intersect(REGULATORS, unlist(strsplit(core_enrichment_stn, "/"))), 
+                            collapse=";"),
+        matches_pt = paste(intersect(REGULATORS, unlist(strsplit(core_enrichment_pt, "/"))), 
+                           collapse=";")
+    ) %>%
+    ungroup() # 19 gene sets
+# 19 out of 103 differential gene sets contain regulators
+# only PT samples contain regulators as core enrichment
+
+plts[["coexpression_tcga-TTLLs_vs_all-go_enrichment-regulators_enriched"]] = x %>%
+    separate_rows(matches_stn, matches_pt) %>%
+    distinct(Description, matches_stn, matches_pt) %>%
+    pivot_longer(-Description, names_to="sample_type", values_to="regulators") %>%
+    mutate(regulators = ifelse(regulators == "", NA, regulators)) %>%
+    drop_na(regulators) %>%
+    count(sample_type, regulators, Description) %>%
+    ggbarplot(x="regulators", y="n", fill="Description", palette=get_palette("Paired",19), color=NA) +
+    facet_wrap(~sample_type) +
+    theme(strip.text.x = element_text(size=6, family=FONT_FAMILY)) +
+    labs(x="Regulator TTLL11", y="Count in Gene Sets")
+
 
 ### CHEA TFs
 X = enrichments[["STN"]][["tf_targets"]] %>%
-    distinct(Description, NES, Cluster) %>%
+    distinct(Description, NES, Cluster, GeneRatio, core_enrichment) %>%
     left_join(
         enrichments[["PT"]][["tf_targets"]] %>%
-        distinct(Description, NES, Cluster),
+        distinct(Description, NES, Cluster, GeneRatio, core_enrichment),
         by = c("Description","Cluster"),
         suffix = c("_stn","_pt")
     ) %>%
+    mutate(NES_diff = NES_pt - NES_stn,
+           abs_NES_diff = abs(NES_diff)) %>%
     drop_na()
 
 plts[["coexpression_tcga-TTLLs_vs_all-tf_targets_enrichment-pt_vs_stn"]] = X %>%
@@ -361,6 +423,59 @@ plts[["coexpression_tcga-TTLLs_vs_all-tf_targets_enrichment-pt_vs_stn"]] = X %>%
     theme_pubr() +
     labs(x="NES Primary Tumor", y="NES Solid Tissue Normal")
 
+terms_oi = X %>% 
+    group_by(Cluster) %>%
+    slice_max(abs(NES_diff), n=5) %>%
+    ungroup() %>%
+    pull(Description) %>%
+    unique()
+plts[["coexpression_tcga-TTLLs_vs_all-tf_targets_enrichment-pt_vs_stn_diff"]] = X %>%
+    filter(Description %in% terms_oi) %>%
+    arrange(desc(Cluster), Description) %>%
+    mutate(Description = factor(Description, levels=unique(Description))) %>%
+    ggscatter(x="Cluster", y="Description", size="abs_NES_diff", color="NES_diff") +
+    scale_size("|Delta NES|", range=c(0.5,3)) + 
+    scale_color_continuous(low="darkgreen", high="orange", name="Delta NES") +
+    theme_pubr(x.text.angle = 70)
+
+#### which gene sets contain drivers of lowering TTLL11
+x = X %>% 
+    filter(NES_diff<(-1) & Cluster=="TTLL11") %>% # 3 gene sets
+    filter(
+        str_detect(string=core_enrichment_stn, pattern=paste(REGULATORS, collapse="|")) | 
+        str_detect(string=core_enrichment_pt, pattern=paste(REGULATORS, collapse="|"))
+    ) %>%
+    rowwise() %>%
+    mutate(
+        matches_stn = paste(intersect(REGULATORS, unlist(strsplit(core_enrichment_stn, "/"))), 
+                            collapse=";"),
+        matches_pt = paste(intersect(REGULATORS, unlist(strsplit(core_enrichment_pt, "/"))), 
+                           collapse=";")
+    ) %>%
+    ungroup() # 3 gene sets
+# 3 out of 3 differential gene sets contain regulators
+# only PT samples contain regulators as core enrichment
+
+plts[["coexpression_tcga-TTLLs_vs_all-tf_targets_enrichment-regulators_enriched"]] = x %>%
+    separate_rows(matches_stn, matches_pt) %>%
+    distinct(Description, matches_stn, matches_pt) %>%
+    pivot_longer(-Description, names_to="sample_type", values_to="regulators") %>%
+    mutate(regulators = ifelse(regulators == "", NA, regulators)) %>%
+    drop_na(regulators) %>%
+    count(sample_type, regulators, Description) %>%
+    ggbarplot(x="regulators", y="n", fill="Description", palette=get_palette("Dark2",3), color=NA) +
+    facet_wrap(~sample_type) +
+    theme(strip.text.x = element_text(size=6, family=FONT_FAMILY)) + 
+    labs(x="Regulator TTLL11", y="Count in Gene Sets")
+
+# coexpression of regulators with TTLLs
+X = corrs
+plts[["coexpression_tcga-TTLLs_vs_all-regulators"]] = X %>% 
+    filter(symbol%in%REGULATORS & gene=="TTLL11") %>% 
+    ggstripchart(x="gene", y="correlation", color="sample_type", 
+                 shape="symbol", palette=PAL_SAMPLE_TYPE) + 
+    labs(x="TTLL Genes", y="Spearman Correlation", 
+         color="Sample Type", shape="Regulator of TTLL11")
 
 # save
 save_plt = function(plts, plt_name, extension='.pdf', 
@@ -383,6 +498,7 @@ save_plt(plts, "coexpression_tcga-TTLLs_vs_all-violin-pt", ".pdf", figs_dir, wid
 save_plt(plts, "coexpression_tcga-TTLLs_vs_all-violin-stn", ".pdf", figs_dir, width=15, height=10)
 save_plt(plts, "coexpression_tcga-TTLLs_vs_all-scatter-pt_vs_stn", ".pdf", figs_dir, width=15, height=10)
 
+# separate enrichments
 save_plt(plts, "coexpression_tcga-TTLLs_vs_all-go_enrichment_dotplot-lowNES-pt", ".pdf", figs_dir, width=15, height=12)
 save_plt(plts, "coexpression_tcga-TTLLs_vs_all-go_enrichment_dotplot-highNES-pt", ".pdf", figs_dir, width=15, height=12)
 save_plt(plts, "coexpression_tcga-TTLLs_vs_all-tf_targets_enrichment_dotplot-highNES-pt", ".pdf", figs_dir, width=10, height=10)
@@ -390,7 +506,17 @@ save_plt(plts, "coexpression_tcga-TTLLs_vs_all-go_enrichment_dotplot-lowNES-stn"
 save_plt(plts, "coexpression_tcga-TTLLs_vs_all-go_enrichment_dotplot-highNES-stn", ".pdf", figs_dir, width=15, height=12)
 save_plt(plts, "coexpression_tcga-TTLLs_vs_all-tf_targets_enrichment_dotplot-highNES-stn", ".pdf", figs_dir, width=10, height=10)
 
+# compare enrichments
 save_plt(plts, "coexpression_tcga-TTLLs_vs_all-go_enrichment-pt_vs_stn", ".pdf", figs_dir, width=10, height=10)
+save_plt(plts, "coexpression_tcga-TTLLs_vs_all-go_enrichment-pt_vs_stn_diff", ".pdf", figs_dir, width=15, height=15)
 save_plt(plts, "coexpression_tcga-TTLLs_vs_all-tf_targets_enrichment-pt_vs_stn", ".pdf", figs_dir, width=10, height=10)
+save_plt(plts, "coexpression_tcga-TTLLs_vs_all-tf_targets_enrichment-pt_vs_stn_diff", ".pdf", figs_dir, width=8, height=10)
+
+# TTLL11 regulators in differentially enriched coexpression gene sets
+save_plt(plts, 'coexpression_tcga-TTLLs_vs_all-go_enrichment-regulators_enriched', ".pdf", figs_dir, width=4, height=8)
+save_plt(plts, 'coexpression_tcga-TTLLs_vs_all-tf_targets_enrichment-regulators_enriched', ".pdf", figs_dir, width=4, height=6)
+
+save_plt(plts, "coexpression_tcga-TTLLs_vs_all-regulators", ".pdf", figs_dir, width=5, height=5)
+
 
 print("Done!")

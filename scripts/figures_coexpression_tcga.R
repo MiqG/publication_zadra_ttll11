@@ -1,3 +1,11 @@
+# 
+# Author: Miquel Anglada Girotto
+# Contact: miquel [dot] anglada [at] crg [dot] eu
+#
+# Script purpose
+# --------------
+# Compare coexpression of TTLLs in healthy and tumor tissues.
+#
 
 require(tidyverse)
 require(ggpubr)
@@ -8,6 +16,9 @@ require(ggrepel)
 require(clusterProfiler)
 require(org.Hs.eg.db)
 require(enrichplot)
+require(ComplexHeatmap)
+require(ggplotify)
+require(ggvenn)
 
 ROOT = here::here()
 DATA_DIR = file.path(ROOT,'data')
@@ -30,6 +41,7 @@ FONT_FAMILY = 'Helvetica'
 PAL_SAMPLE_TYPE = rev(get_palette("npg",2))
 PAL_FDR_DARK = "#005AB5"
 PAL_FDR_LIGHT = "#DC3220"
+PAL_SINGLE_DARK = "#716454"
 
 # inputs
 phenotype_file = file.path(PREP_DIR,'sample_phenotype.tsv')
@@ -115,11 +127,12 @@ plts[["coexpression_tcga-TTLLs_vs_all-scatter-pt_vs_stn"]] = X %>%
                 values_from="correlation", values_fn = mean) %>%
     drop_na() %>%
     ggplot(aes(x=`Primary Tumor`, y=`Solid Tissue Normal`)) +
-    geom_scattermore(pixels=c(1000,1000), pointsize=4, alpha=0.5) +
+    geom_scattermore(pixels=c(1000,1000), pointsize=4, alpha=0.1) +
+    stat_cor(method="spearman", size=1.5, family=FONT_FAMILY) +
+    theme_pubr() +
     facet_wrap(~gene) +
-    theme(strip.text.x = element_text(size=6, family=FONT_FAMILY)) +
-    stat_cor(method="spearman", size=2, family=FONT_FAMILY) +
-    theme_pubr()
+    theme(aspect.ratio=1, strip.text.x = element_text(size=6, family=FONT_FAMILY)) +
+    labs(x="Coexpression Primary Tumor", y="Coexpression Solid Tissue Normal")
 
 # gene set enrichment analysis for each TTLL
 enrichments = list()
@@ -345,6 +358,7 @@ X = enrichments[["STN"]][["GO"]] %>%
     mutate(NES_diff = NES_pt - NES_stn,
            abs_NES_diff = abs(NES_diff)) %>%
     drop_na()
+enrichment_go = X %>% mutate(ontology="GO")
 
 plts[["coexpression_tcga-TTLLs_vs_all-go_enrichment-pt_vs_stn"]] = X %>%
     ggplot(aes(x=NES_pt, y=NES_stn)) +
@@ -357,7 +371,7 @@ plts[["coexpression_tcga-TTLLs_vs_all-go_enrichment-pt_vs_stn"]] = X %>%
 
 terms_oi = X %>% 
     group_by(Cluster) %>%
-    slice_max(abs(NES_diff), n=5) %>%
+    slice_max(abs(NES_diff), n=4) %>%
     ungroup() %>%
     pull(Description) %>%
     unique()
@@ -366,9 +380,15 @@ plts[["coexpression_tcga-TTLLs_vs_all-go_enrichment-pt_vs_stn_diff"]] = X %>%
     arrange(desc(Cluster), Description) %>%
     mutate(Description = factor(Description, levels=unique(Description))) %>%
     ggscatter(x="Cluster", y="Description", size="abs_NES_diff", color="NES_diff") +
-    scale_size("|Delta NES|", range=c(0.5,3)) + 
+    scale_size("|Delta NES|", range=c(0.5,2)) + 
     scale_color_continuous(low="darkgreen", high="orange", name="Delta NES") +
-    theme_pubr(x.text.angle = 70)
+    theme_pubr(x.text.angle=70) +
+    labs(x="Coexpr. Signature", y="GO BP Term") +
+    theme(panel.grid.major = element_line(
+        color = "lightgrey", size = 0.1)
+    ) +
+    coord_flip()
+
 
 #### which gene sets contain drivers of lowering TTLL11
 x = X %>% 
@@ -414,6 +434,7 @@ X = enrichments[["STN"]][["tf_targets"]] %>%
     mutate(NES_diff = NES_pt - NES_stn,
            abs_NES_diff = abs(NES_diff)) %>%
     drop_na()
+enrichment_tf = X %>% mutate(ontology="TFs")
 
 plts[["coexpression_tcga-TTLLs_vs_all-tf_targets_enrichment-pt_vs_stn"]] = X %>%
     ggplot(aes(x=NES_pt, y=NES_stn)) +
@@ -426,7 +447,7 @@ plts[["coexpression_tcga-TTLLs_vs_all-tf_targets_enrichment-pt_vs_stn"]] = X %>%
 
 terms_oi = X %>% 
     group_by(Cluster) %>%
-    slice_max(abs(NES_diff), n=5) %>%
+    slice_max(abs(NES_diff), n=4) %>%
     ungroup() %>%
     pull(Description) %>%
     unique()
@@ -435,9 +456,84 @@ plts[["coexpression_tcga-TTLLs_vs_all-tf_targets_enrichment-pt_vs_stn_diff"]] = 
     arrange(desc(Cluster), Description) %>%
     mutate(Description = factor(Description, levels=unique(Description))) %>%
     ggscatter(x="Cluster", y="Description", size="abs_NES_diff", color="NES_diff") +
-    scale_size("|Delta NES|", range=c(0.5,3)) + 
+    scale_size("|Delta NES|", range=c(0.5,2)) + 
     scale_color_continuous(low="darkgreen", high="orange", name="Delta NES") +
-    theme_pubr(x.text.angle = 70)
+    theme_pubr(x.text.angle = 70) +
+    theme(panel.grid.major = element_line(
+        color = "lightgrey", size = 0.1)
+    ) +
+    labs(x="Coexp. Sign.", y="TF Targets")
+
+#### intersection between genes lowering TTLL11
+X = enrichment_tf %>%
+        filter(Cluster=="TTLL11" & NES_diff<(-1)) #%>%
+#     bind_rows(
+#         enrichment_go %>%
+#         filter(Cluster=="TTLL11" & NES_diff<(-4))
+#     )
+
+x = X  %>%
+    group_by(ontology, Description) %>%
+#     mutate(core_enrichment = paste(union(
+#         unlist(strsplit(core_enrichment_pt, "/")),
+#         unlist(strsplit(core_enrichment_stn, "/"))
+#     ), collapse="/") ) %>%
+    # we select genes coexpressed with TTLL11 differentially enriched 
+    mutate(core_enrichment = core_enrichment_pt) %>%
+    ungroup() %>%
+    distinct(ontology, Description, core_enrichment) %>%
+    separate_rows(core_enrichment)
+
+m = x %>%
+    with(., split(core_enrichment, Description)) 
+    
+plts[["coexpression_tcga-TTLLs_vs_all-tf_targets_enrichment-venn"]] = m %>%
+    ggvenn(stroke_color=NA, fill_color=get_palette("Dark2",3), 
+           text_size=2, set_name_size=2, show_percentage=FALSE)
+
+plts[["coexpression_tcga-TTLLs_vs_all-tf_targets_enrichment-upset"]] = m %>%
+    list_to_matrix() %>%
+    make_comb_mat() %>%
+    UpSet(
+        comb_order = order(comb_size(m)), 
+        comb_col = PAL_SINGLE_DARK,
+        top_annotation = upset_top_annotation(m, gp = gpar(fill = PAL_SINGLE_DARK, col=NA)),
+        right_annotation = upset_right_annotation(m, gp = gpar(fill = PAL_SINGLE_DARK, col=NA))) %>%
+    draw() %>%
+    grid.grabExpr() %>%
+    as.ggplot()
+
+x = x %>% 
+    count(core_enrichment) %>%
+    arrange(n) %>%
+    left_join(
+        corrs %>% 
+        filter(gene=="TTLL11"),
+        by=c("core_enrichment"="symbol")
+    ) %>%
+    group_by(sample_type, n) %>%
+    arrange(correlation) %>%
+    mutate(index=row_number(),
+           n_label=paste0(n," (n=",n(),")")) %>%
+    ungroup() %>%
+    drop_na() %>%
+    filter(sample_type=="Primary Tumor")
+
+plts[["coexpression_tcga-TTLLs_vs_all-tf_targets_enrichment-scatter"]] = x %>%
+    ggplot(aes(x=index, y=correlation)) +
+    geom_scattermore(pixels=c(1000,1000), pointsize=8, 
+                     alpha=0.5, color=PAL_SINGLE_DARK) +
+    theme_pubr() +
+    facet_wrap(~n_label+sample_type, scales="free") +
+    theme(strip.text.x = element_text(size=6, family=FONT_FAMILY)) +
+    theme(aspect.ratio=1) +
+    geom_text_repel(
+        aes(label=core_enrichment),
+        x %>% group_by(sample_type, n) %>% slice_max(abs(correlation), n=10),
+        size=2, family=FONT_FAMILY, segment.size=0.1, max.overlaps=50
+    ) +
+    labs(x="Gene", y="Coexpression TTLL11")
+
 
 #### which gene sets contain drivers of lowering TTLL11
 x = X %>% 
@@ -458,18 +554,14 @@ x = X %>%
 # 3 out of 6 differential gene sets contain regulators
 # only PT samples contain regulators as core enrichment
 
-plts[["coexpression_tcga-TTLLs_vs_all-tf_targets_enrichment-regulators_enriched"]] = x %>%
-    separate_rows(matches_stn, matches_pt) %>%
-    distinct(Description, matches_stn, matches_pt, is_deregulated) %>%
-    pivot_longer(-c(Description, is_deregulated), names_to="sample_type", values_to="regulators") %>%
-    mutate(regulators = ifelse(regulators == "", NA, regulators)) %>%
-    drop_na(regulators) %>%
-    distinct() %>%
-    count(sample_type, regulators, is_deregulated, Description) %>%
-    ggbarplot(x="regulators", y="n", fill="Description", palette=get_palette("Dark2",6), color=NA) +
-    facet_wrap(~sample_type + is_deregulated) +
-    theme(strip.text.x = element_text(size=6, family=FONT_FAMILY)) + 
-    labs(x="Regulator TTLL11", y="Count in Gene Sets")
+plts[["coexpression_tcga-TTLLs_vs_all-tf_targets_enrichment-regulators_enriched"]] = x %>% 
+    pivot_longer(c(matches_pt, matches_stn), names_to = "sample_type", values_to="regulators") %>% 
+    mutate(regulators=ifelse(regulators=="",NA,regulators)) %>% 
+    ggscatter(x="NES_pt", y="NES_stn", color="regulators") + 
+    geom_text_repel(aes(label=Description), size=2, family=FONT_FAMILY, segment.size=0.1) + 
+    facet_wrap(~sample_type) +     
+    theme(strip.text.x = element_text(size=6, family=FONT_FAMILY)) +
+    labs(x="NES Primary Tumor", y="NES Solid Tissue Normal")
 
 # coexpression of regulators with TTLLs
 X = corrs
@@ -499,7 +591,7 @@ save_plt = function(plts, plt_name, extension='.pdf',
 dir.create(figs_dir, recursive=TRUE)
 save_plt(plts, "coexpression_tcga-TTLLs_vs_all-violin-pt", ".pdf", figs_dir, width=15, height=10)
 save_plt(plts, "coexpression_tcga-TTLLs_vs_all-violin-stn", ".pdf", figs_dir, width=15, height=10)
-save_plt(plts, "coexpression_tcga-TTLLs_vs_all-scatter-pt_vs_stn", ".pdf", figs_dir, width=15, height=10)
+save_plt(plts, "coexpression_tcga-TTLLs_vs_all-scatter-pt_vs_stn", ".pdf", figs_dir, width=8, height=8)
 
 # separate enrichments
 save_plt(plts, "coexpression_tcga-TTLLs_vs_all-go_enrichment_dotplot-lowNES-pt", ".pdf", figs_dir, width=15, height=12)
@@ -511,15 +603,20 @@ save_plt(plts, "coexpression_tcga-TTLLs_vs_all-tf_targets_enrichment_dotplot-hig
 
 # compare enrichments
 save_plt(plts, "coexpression_tcga-TTLLs_vs_all-go_enrichment-pt_vs_stn", ".pdf", figs_dir, width=10, height=10)
-save_plt(plts, "coexpression_tcga-TTLLs_vs_all-go_enrichment-pt_vs_stn_diff", ".pdf", figs_dir, width=15, height=15)
+save_plt(plts, "coexpression_tcga-TTLLs_vs_all-go_enrichment-pt_vs_stn_diff", ".pdf", figs_dir, width=8, height=9.75)
 save_plt(plts, "coexpression_tcga-TTLLs_vs_all-tf_targets_enrichment-pt_vs_stn", ".pdf", figs_dir, width=10, height=10)
-save_plt(plts, "coexpression_tcga-TTLLs_vs_all-tf_targets_enrichment-pt_vs_stn_diff", ".pdf", figs_dir, width=8, height=10)
+save_plt(plts, "coexpression_tcga-TTLLs_vs_all-tf_targets_enrichment-pt_vs_stn_diff", ".pdf", figs_dir, width=4, height=8)
 
 # TTLL11 regulators in differentially enriched coexpression gene sets
 save_plt(plts, 'coexpression_tcga-TTLLs_vs_all-go_enrichment-regulators_enriched', ".pdf", figs_dir, width=3, height=8)
 save_plt(plts, 'coexpression_tcga-TTLLs_vs_all-tf_targets_enrichment-regulators_enriched', ".pdf", figs_dir, width=7, height=6)
+save_plt(plts, 'coexpression_tcga-TTLLs_vs_all-tf_targets_enrichment-venn', ".pdf", figs_dir, width=3, height=3)
+save_plt(plts, 'coexpression_tcga-TTLLs_vs_all-tf_targets_enrichment-scatter', ".pdf", figs_dir, width=13, height=7)
 
 save_plt(plts, "coexpression_tcga-TTLLs_vs_all-regulators", ".pdf", figs_dir, width=5, height=5)
+
+
+# save data
 
 
 print("Done!")

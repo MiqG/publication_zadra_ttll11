@@ -40,6 +40,11 @@ TEST_METHOD = 'wilcox.test'
 PAL_SAMPLE_TYPE = setNames(get_palette("npg",2), c("Primary Tumor", "Solid Tissue Normal"))
 FONT_SIZE = 7 # pt
 FONT_FAMILY = 'Arial'
+PAL_STATUS = setNames(
+    c("orange","darkred","black",'#4DBBD5FF'),
+    #c("#E9B872","#A63D40","#151515"),
+    c("CCNE1_low & CDC25A_low", "CCNE1_high & CDC25A_high", "N.R.","STN")
+)
 
 # inputs
 genexpr_ttlls_file = file.path(PREP_DIR,'genexpr_TTLLs.tsv')
@@ -74,40 +79,45 @@ X = X %>%
     group_by(cancer_type) %>%
     mutate(
         status_cyclin = case_when(
-            CCNE1 < quantile(CCNE1, THRESH_LOW) ~ "low_cyclin",
-            CCNE1 > quantile(CCNE1, THRESH_HIGH) ~ "high_cyclin",
-            CCNE1 >= quantile(CCNE1, THRESH_LOW) & CCNE1 <= quantile(CCNE1, THRESH_HIGH) ~ "regular_cyclin"
+            CCNE1 < quantile(CCNE1, THRESH_LOW) ~ "CCNE1_low",
+            CCNE1 > quantile(CCNE1, THRESH_HIGH) ~ "CCNE1_high",
+            CCNE1 >= quantile(CCNE1, THRESH_LOW) & CCNE1 <= quantile(CCNE1, THRESH_HIGH) ~ "CCNE1_regular"
         ),
         status_cdc25 = case_when(
-            CDC25A < quantile(CDC25A, THRESH_LOW) ~ "low_cdc25",
-            CDC25A > quantile(CDC25A, THRESH_HIGH) ~ "high_cdc25",
-            CDC25A >= quantile(CDC25A, THRESH_LOW) & CDC25A <= quantile(CDC25A, THRESH_HIGH) ~ "regular_cdc25"
+            CDC25A < quantile(CDC25A, THRESH_LOW) ~ "CDC25A_low",
+            CDC25A > quantile(CDC25A, THRESH_HIGH) ~ "CDC25A_high",
+            CDC25A >= quantile(CDC25A, THRESH_LOW) & CDC25A <= quantile(CDC25A, THRESH_HIGH) ~ "CDC25A_regular"
         ),
         status_combined = paste0(status_cyclin, " & ", status_cdc25),
         status_combined = ifelse(sample_type == "Solid Tissue Normal", "STN", status_combined)
     ) %>%
-    ungroup()
+    ungroup() %>%
+    mutate(
+        status_combined_clean = ifelse(
+            (status_combined %in% c("CCNE1_low & CDC25A_low", "CCNE1_high & CDC25A_high")), 
+            status_combined,
+            "N.R."
+        )
+    )
 
 # viz
 plts[["coexpression_cyclinE_cdc25"]] = X %>% 
     filter(sample_type=="Primary Tumor") %>%
     ggplot(aes(x=CCNE1, y=CDC25A)) + 
-    geom_scattermore(aes(color=status_combined), 
-                     pixels=c(1000,1000), pointsize=6, alpha=0.5) + 
-    color_palette("Paired") +
-    stat_cor(method="spearman", size=2, family=FONT_FAMILY) +
+    geom_scattermore(aes(color=status_combined_clean), pixels=c(1000,1000), pointsize=10, alpha=0.5) +
+    stat_cor(method="spearman", size=1.5, family=FONT_FAMILY) +
     theme_pubr() +
-    facet_wrap(~cancer_type, scales="free") + 
-    theme(strip.text.x = element_text(size=6, family=FONT_FAMILY),
-          aspect.ratio = 1) +
-    labs(x=TeX('$log_2(Norm. CountCCNE1 + 1)$'), y=TeX('$log_2(Norm. CountCDC25A + 1)$'))
+    facet_wrap(~cancer_type, scales="free") +
+    theme(aspect.ratio=1, strip.text.x = element_text(size=6, family=FONT_FAMILY)) +
+    color_palette(PAL_STATUS) +
+    labs(x="log2(Norm. Count CCNE1 + 1)", y="log2(Norm. Count CDC25A + 1)", color="Gene Status")
 
 ##### Run Differential analysis for all TTLLs across cancers considering oncogenes status #####
 # which cancers have enough samples?
 comparisons_oi = X %>% 
     filter(sample_type=="Primary Tumor") %>% 
     count(cancer_type, status_combined) %>% 
-    filter(!(status_combined=="regular_cyclin & regular_cdc25") & n>20)
+    filter(!(status_combined=="CCNE1_regular & CDC25A_regular")) #& n>20)
 
 # differential gene expression function
 run_wilcox = function(df, condition_a='Primary Tumor', condition_b='Solid Tissue Normal'){
@@ -175,20 +185,28 @@ result = do.call(rbind, result)
 ##### Plot Gene Expression Distributions of TTLL11 across cancers #####
 status_order = c(
     'STN',
-    'high_cyclin & high_cdc25',
-    'high_cyclin & regular_cdc25',
-    'regular_cyclin & high_cdc25',
-    'low_cyclin & regular_cdc25',
-    'regular_cyclin & low_cdc25',
-    'low_cyclin & low_cdc25'
+    'CCNE1_high & CDC25A_high',
+    'CCNE1_high & CDC25A_low',
+    'CCNE1_low & CDC25A_high',
+    'CCNE1_high & CDC25A_regular',
+    'CCNE1_regular & CDC25A_high',
+    'CCNE1_regular & CDC25A_low',
+    'CCNE1_low & CDC25A_regular',
+    'CCNE1_low & CDC25A_low'
+)
+
+status_order = c(
+    'STN',
+    'CCNE1_high & CDC25A_high',
+    'CCNE1_low & CDC25A_low'
 )
 
 plts[["differential_expression_by_status-TTLL11"]] = df %>%
-    filter(gene == "TTLL11") %>%
+    filter(gene == "TTLL11" & status_combined%in%status_order) %>%
     mutate(status_combined = factor(status_combined, levels=status_order),
            cancer_type = factor(cancer_type, levels=CANCERS_OI)) %>%
     ggplot(aes(x=status_combined, y=expression)) +
-    geom_boxplot(aes(fill=sample_type), outlier.size=0.1) +
+    geom_boxplot(aes(fill=sample_type), outlier.size=0.1, lwd=0.1) +
     fill_palette(PAL_SAMPLE_TYPE) +
     theme_pubr(x.text.angle = 70) +
     facet_wrap(~cancer_type) +
@@ -197,6 +215,46 @@ plts[["differential_expression_by_status-TTLL11"]] = df %>%
     stat_compare_means(aes(label=..p.signif..),
                        method=TEST_METHOD, ref.group="STN", size=2, family=FONT_FAMILY) + 
     labs(x="Oncogene Status", y=TeX('$log_2(Norm. Count + 1)$'), fill="Sample Type")
+
+
+comparisons = list(
+    c("STN","CCNE1_high & CDC25A_high"),
+    c("STN","CCNE1_low & CDC25A_low")
+)
+x = df %>%
+    filter(gene == "TTLL11" & status_combined%in%status_order) %>%
+    mutate(status_combined = factor(status_combined, levels=status_order),
+           cancer_type = factor(cancer_type, levels=CANCERS_OI))
+tests = compare_means(
+    formula=expression~status_combined, data=x, 
+    method=TEST_METHOD, ref.group="STN", 
+    group.by="cancer_type", comparisons=comparisons) %>%
+    mutate(status_combined=group2)
+
+plts[["differential_expression_by_status_and_cancer-TTLL11"]] = x %>%
+    ggplot(aes(x=cancer_type, y=expression, group=interaction(cancer_type,status_combined))) +
+    geom_boxplot(aes(fill=status_combined), outlier.size=0.1, position=position_dodge(0.7), width=0.5, lwd=0.1) +
+    fill_palette(PAL_STATUS[status_order]) +
+    theme_pubr() +
+    geom_text(aes(label=p.signif, y=9, group=status_combined), tests, size=2, 
+              family=FONT_FAMILY, position=position_dodge(0.7)) +
+    labs(x="Cancer Type", y="log2(Norm. Count + 1)", fill="Sample Type")
+
+x = x %>% mutate(cancer_type="PANCAN")
+tests = compare_means(
+    formula=expression~status_combined, data=x, 
+    method=TEST_METHOD, ref.group="STN", 
+    group.by="cancer_type", comparisons=comparisons) %>%
+    mutate(status_combined=group2)
+
+plts[["differential_expression_by_status_and_pancan-TTLL11"]] = x %>%
+    ggplot(aes(x=cancer_type, y=expression, group=interaction(cancer_type,status_combined))) +
+    geom_boxplot(aes(fill=status_combined), outlier.size=0.1, position=position_dodge(0.7), width=0.5, lwd=0.1) +
+    fill_palette(PAL_STATUS[status_order]) +
+    theme_pubr() +
+    geom_text(aes(label=p.signif, y=9, group=status_combined), tests, size=2, 
+              family=FONT_FAMILY, position=position_dodge(0.7)) +
+    labs(x="Cancer Type", y="log2(Norm. Count + 1)", fill="Sample Type")
 
 # save
 save_plt = function(plts, plt_name, extension='.pdf', 
@@ -215,7 +273,9 @@ save_plt = function(plts, plt_name, extension='.pdf',
 
 ## plots
 dir.create(figs_dir, recursive=TRUE)
-save_plt(plts, "coexpression_cyclinE_cdc25", ".pdf", figs_dir, width=12, height=15)
-save_plt(plts, "differential_expression_by_status-TTLL11", ".pdf", figs_dir, width=12, height=15)
+save_plt(plts, "coexpression_cyclinE_cdc25", ".pdf", figs_dir, width=10, height=12)
+save_plt(plts, "differential_expression_by_status-TTLL11", ".pdf", figs_dir, width=15, height=18)
+save_plt(plts, "differential_expression_by_status_and_cancer-TTLL11", ".pdf", figs_dir, width=12, height=7)
+save_plt(plts, "differential_expression_by_status_and_pancan-TTLL11", ".pdf", figs_dir, width=2.25, height=7)
 
 print("Done!")

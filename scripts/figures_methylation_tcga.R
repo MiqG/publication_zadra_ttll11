@@ -64,6 +64,17 @@ plts[["methylation_tcga-TTLL11-boxplots"]] = X %>%
     labs(x="Cancer Type", y="median(Methylation Beta)", 
          fill="Sample Type")
 
+plts[["methylation_tcga-TTLL11-boxplots_vs_pancan"]] = X %>%
+    mutate(cancer_type="PANCAN") %>%
+    ggboxplot(x="cancer_type", y="beta", 
+              fill="sample_type", palette=PAL_SAMPLE_TYPE,
+              order=ORDER_OI, outlier.size = 0.1, lwd=0.1) +
+    stat_compare_means(aes(group=sample_type), 
+                       method=TEST_METHOD, label="p.signif",
+                       size=2, family=FONT_FAMILY) +
+    labs(x="Cancer Type", y="median(Methylation Beta)", 
+         fill="Sample Type")
+
 methylation_TTLL11 = X
 
 # does the expression of TTLL11 correlate with its methylation?
@@ -130,13 +141,14 @@ save_plt = function(plts, plt_name, extension='.pdf',
                     font.tickslab=6, font.family=FONT_FAMILY)   
     }
     filename = file.path(directory,paste0(plt_name,extension))
-    save_plot(filename, plt, base_width=width, base_height=height, dpi=dpi, units='cm', device=cairo_pdf)
+    save_plot(filename, plt, base_width=width, base_height=height, dpi=dpi, units='cm')
 }
 
 ## plots
 dir.create(figs_dir, recursive=TRUE)
 save_plt(plts, "methylation_tcga-TTLL11-counts", ".pdf", figs_dir, width=12, height=7)
 save_plt(plts, "methylation_tcga-TTLL11-boxplots", ".pdf", figs_dir, width=12, height=7)
+save_plt(plts, "methylation_tcga-TTLL11-boxplots_vs_pancan", ".pdf", figs_dir, width=2.5, height=7)
 save_plt(plts, "methylation_tcga-cor_expression_met-TTLL11", ".pdf", figs_dir, width=8, height=8)
 save_plt(plts, "methylation_tcga-cor_expression_met-TTLL11_vs_all", ".pdf", figs_dir, width=6, height=6)
 

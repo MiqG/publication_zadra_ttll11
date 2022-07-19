@@ -12,6 +12,7 @@ require(scattermore)
 require(ggpubr)
 require(ggrepel)
 require(cowplot)
+require(extrafont)
 
 # variables
 ROOT = here::here()
@@ -24,7 +25,7 @@ genes_oi = c("ENSG00000175764")
 TEST_METHOD = 'wilcox.test'
 PAL_SAMPLE_TYPE = rev(get_palette("npg",2))
 FONT_SIZE = 7 # pt
-FONT_FAMILY = 'Helvetica'
+FONT_FAMILY = 'Arial'
 
 # inputs
 metadata_file = file.path(RAW_DIR,"GSE185512","metadata.tsv")
@@ -146,6 +147,19 @@ plts[["genexpr-eda-oe-norm-aggregated"]] = genexpr_oi %>%
     geom_hline(yintercept=0, linetype="dashed", size=0.2) +
     guides(color="none") +
     labs(x="Treatment", y="log2(TPM + 1) w.r.t. Empty", shape="Cell Line", title=genes_oi)
+
+plts[["genexpr-eda-oe-norm-aggregated-simple"]] = genexpr_oi %>% 
+    filter(treatment!="Hydroxyurea" & cell_line_simple!="RPE1TP53mut") %>%
+    mutate(treatment = factor(treatment, levels=c("NO Dox","Doxycycline")),
+           condition = factor(condition, levels=c("Cdc25a", "CyclinE", "Myc", "Empty"))) %>%
+    ggplot(aes(x=condition, y=norm_log2tpm, group=interaction(condition,treatment))) +
+    geom_boxplot(aes(color=treatment), fill=NA, outlier.shape=NA, width=0.5, position=position_dodge(0.7)) +
+    geom_point(aes(shape=cell_line_simple, group=treatment), size=0.5, position=position_jitterdodge(jitter.width=0.2, dodge.width=0.7)) +
+    stat_compare_means(method=TEST_METHOD, label="p.signif", size=2, family=FONT_FAMILY) +
+    color_palette(PAL_SAMPLE_TYPE) +
+    geom_hline(yintercept=0, linetype="dashed", size=0.2) +
+    theme_pubr() +
+    labs(x="Overexpr. Condition", y="log2(TPM + 1) w.r.t. Empty", shape="Cell Line", color="Treatment", title=genes_oi)
 
 plts[["genexpr-eda-t-norm"]] = genexpr_oi %>% 
     filter(treatment=="Doxycycline") %>%
@@ -272,7 +286,7 @@ save_plt = function(plts, plt_name, extension='.pdf',
                     font.tickslab=6, font.family=FONT_FAMILY)   
     }
     filename = file.path(directory,paste0(plt_name,extension))
-    save_plot(filename, plt, base_width=width, base_height=height, dpi=dpi, units='cm', device=cairo_pdf)
+    save_plot(filename, plt, base_width=width, base_height=height, dpi=dpi, units='cm')
 }
 
 dir.create(output_figdir, recursive=TRUE)
@@ -290,6 +304,8 @@ plt_name = "genexpr-eda-oe-norm"
 ggsave(sprintf(file.path(output_figdir,"%s.pdf"), plt_name), plts[[plt_name]], units = 'cm', width = 12, height = 12)
 
 save_plt(plts, "genexpr-eda-oe-norm-aggregated", ".pdf", output_figdir, width=12, height=15)
+
+save_plt(plts, "genexpr-eda-oe-norm-aggregated-simple", ".pdf", output_figdir, width=5, height=7)
 
 plt_name = "genexpr-eda-t-norm"
 ggsave(sprintf(file.path(output_figdir,"%s.pdf"), plt_name), plts[[plt_name]], units = 'cm', width = 12, height = 13)

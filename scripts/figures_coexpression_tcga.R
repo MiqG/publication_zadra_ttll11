@@ -33,11 +33,11 @@ ORDER_OI = c('LUSC','UCEC','BRCA','STAD','LUAD','KIRP',
 TEST_METHOD = "wilcox.test"
 GENE_OI = "TTLL11"
 GENES_OI = c('TTLL1', 'TTLL2', 'TTLL4', 'TTLL5', 'TTLL6', 'TTLL7', 'TTLL9', 'TTLL11', 'TTLL13')
-REGULATORS = c("CDC25A","CCNE1")
+REGULATORS = c("CDC25A","CCNE1","MYC")
 
 # formatting
 FONT_SIZE = 7 # pt
-FONT_FAMILY = 'Helvetica'
+FONT_FAMILY = 'Arial'
 PAL_SAMPLE_TYPE = rev(get_palette("npg",2))
 PAL_FDR_DARK = "#005AB5"
 PAL_FDR_LIGHT = "#DC3220"

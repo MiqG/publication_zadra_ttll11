@@ -48,6 +48,18 @@ output_figdata = file.path(RESULTS_DIR,'files','figdata-mutation_frequency.xlsx'
 
 
 ##### FUCNTIONS #####
+stars_pval = function(p.value){
+    unclass(
+        symnum(
+            p.value, 
+            corr = FALSE, 
+            na = FALSE, 
+            cutpoints = c(0, 1e-04, 0.001, 0.01, 0.05, 1), 
+            symbols = c("****", "***", "**", "*", "ns")
+        )
+    )
+}
+
 make_plot_bycancer = function(df, gene_oi=GENE_OI, y_lab_pos=-5, is_pancan=FALSE){
     if(!is_pancan){
         ## add missing cancer in gene OI
@@ -65,7 +77,7 @@ make_plot_bycancer = function(df, gene_oi=GENE_OI, y_lab_pos=-5, is_pancan=FALSE
     mutate(
         p=pvalue, 
         p.format=format.pval(pvalue,1),
-        p.signif=stars.pval(pvalue),
+        p.signif=stars_pval(pvalue),
         group1=NA,
         group2=NA)
 

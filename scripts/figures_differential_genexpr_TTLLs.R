@@ -35,6 +35,7 @@ genexpr_file = file.path(PREP_DIR,'genexpr_TTLLs.tsv')
 
 # outputs
 diffexpr_TTLL11_file = file.path(RESULTS_DIR,'figures','differential_expression.pdf')
+diffexpr_TTLL13_file = file.path(RESULTS_DIR,'figures','differential_expression-TTLL13.pdf')
 diffexpr_TTLLs_file = file.path(RESULTS_DIR,'figures','TTLLs-differential_gene_expression-barplot.pdf')
 output_figdata = file.path(RESULTS_DIR,'files','figdata-differential_expression.xlsx')
 
@@ -186,6 +187,36 @@ plt = ggarrange(
 
 # save figure
 ggsave(plt, filename=diffexpr_TTLL11_file, units = 'cm', width=12, dpi=300, height=8.5, device=cairo_pdf)
+
+# plot
+plts = list()
+plts[['bycancer']] = make_boxplots_gene_oi(df,'TTLL13') + scale_y_continuous(limits = quantile(df$expression, c(0.001, 0.999))) 
+plts[['pancancer']] = make_boxplots_gene_oi(df %>% mutate(cancer_type=factor('PANCAN')), 'TTLL13') + scale_y_continuous(limits = quantile(df$expression, c(0.001, 0.999)))
+
+# compose figure
+widths_cancer_type = c(1.15,0.13)
+
+plt = ggarrange(
+    plts[['bycancer']] + 
+        ylab(TeX('$log_2(Norm. Count + 1)$')) + 
+        theme_pubr(base_size = FONT_SIZE) +
+        theme(plot.margin = margin(0,0,0,0, "cm")),
+    #NULL,
+    plts[['pancancer']] + 
+        theme_pubr(base_size = FONT_SIZE) +
+        theme(plot.margin = margin(0,0,0,0, "cm")),
+    widths = widths_cancer_type,
+    common.legend = TRUE,
+    ncol = 2
+) %>% annotate_figure(bottom = text_grob('Cancer Type', 
+                                         size = FONT_SIZE, 
+                                         family = FONT_FAMILY,
+                                         vjust = -0.5)
+                     ) +
+    theme(plot.margin = margin(0.1,0.1,0.1,0.1, "cm"))
+
+# save figure
+ggsave(plt, filename=diffexpr_TTLL13_file, units = 'cm', width=12, dpi=300, height=8.5, device=cairo_pdf)
 
 
 print('Done!')## figure data

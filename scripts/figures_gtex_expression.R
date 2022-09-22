@@ -92,5 +92,6 @@ plt = make_heatmap(genexpr %>% column_to_rownames('gene'), metadata, params)
 # save
 ggsave(output_fig, plt[['heatmap']], width=17, height=25, dpi=300, units='cm', limitsize=FALSE)
 
+filen
 
 print('Done!')

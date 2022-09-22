@@ -279,4 +279,11 @@ save_plt(plts, "differential_expression_by_status-TTLL11", ".pdf", figs_dir, wid
 save_plt(plts, "differential_expression_by_status_and_cancer-TTLL11", ".pdf", figs_dir, width=12, height=7)
 save_plt(plts, "differential_expression_by_status_and_pancan-TTLL11", ".pdf", figs_dir, width=2.25, height=7)
 
+## figdata
+filename = file.path(RESULTS_DIR,"files","figdata-ccne1_cdc25a_tcga-genexpr.xlsx")
+write_xlsx(X, filename)
+filename = file.path(RESULTS_DIR,"files","figdata-ccne1_cdc25a_tcga-diffgenexpr_TTLL11.xlsx")
+result %>% filter(gene=="TTLL11") %>% write_xlsx(filename)
+
+
 print("Done!")

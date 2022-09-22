@@ -617,6 +617,11 @@ save_plt(plts, "coexpression_tcga-TTLLs_vs_all-regulators", ".pdf", figs_dir, wi
 
 
 # save data
-
+filename = file.path(RESULTS_DIR,"files","figdata-coexpression_tcga-correlations.xlsx")
+write_xlsx(corrs, filename)
+filename = file.path(RESULTS_DIR,"files","figdata-coexpression_tcga-enrichment_tf.xlsx")
+write_xlsx(enrichment_tf, filename)
+filename = file.path(RESULTS_DIR,"files","figdata-coexpression_tcga-enrichment_go.xlsx")
+write_xlsx(enrichment_go, filename)
 
 print("Done!")

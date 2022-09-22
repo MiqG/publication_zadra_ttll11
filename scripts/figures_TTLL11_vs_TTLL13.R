@@ -134,5 +134,11 @@ save_plt(plts, "coexpression-scatter", ".pdf", figs_dir, width=10, height=12)
 save_plt(plts, "expression-boxplot-bycancer", ".pdf", figs_dir, width=12, height=7)
 save_plt(plts, "expression-boxplot-pancan", ".pdf", figs_dir, width=2.25, height=7)
 
+# figdata
+filename = file.path(RESULTS_DIR,"files","figdata-TTLL11_vs_TTLL13-genexpr.xlsx")
+X %>%
+    pivot_longer(c(TTLL11,TTLL13), names_to="gene", values_to="expression") %>%
+    write_xlsx(filename)
+
 
 print("Done!")

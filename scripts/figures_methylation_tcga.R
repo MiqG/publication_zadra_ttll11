@@ -153,3 +153,5 @@ save_plt(plts, "methylation_tcga-cor_expression_met-TTLL11", ".pdf", figs_dir, w
 save_plt(plts, "methylation_tcga-cor_expression_met-TTLL11_vs_all", ".pdf", figs_dir, width=6, height=6)
 
 ## figdata
+filename = file.path(RESULTS_DIR,'files','figdata-methylation_TTLL11_tcga.xlsx')
+write_tsv(methylation_TTLL11, filename)

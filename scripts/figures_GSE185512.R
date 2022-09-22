@@ -13,6 +13,7 @@ require(ggpubr)
 require(ggrepel)
 require(cowplot)
 require(extrafont)
+require(writexl)
 
 # variables
 ROOT = here::here()
@@ -36,7 +37,6 @@ dge_mut_file = file.path(RESULTS_DIR,"files","dge_p53mutation-GSE185512-rpe1_120
 
 # outputs
 output_figdir = file.path(RESULTS_DIR,"figures","differential_gene_expression-GSE185512")
-output_figdata = file.path()
 
 # initialize
 plts = list()
@@ -44,7 +44,7 @@ plts = list()
 # load data
 metadata = read_tsv(metadata_file)
 counts = read_tsv(counts_file)
-gene_lengths = read_tsv("~/databases/data/GENCODE/gene_length.tsv") ###### TODO
+gene_lengths = read_tsv("~/databases/data/GENCODE/gene_length.tsv")
 dge_oe = read_tsv(dge_oe_file)
 dge_t = read_tsv(dge_t_file)
 dge_mut = read_tsv(dge_mut_file)
@@ -330,5 +330,12 @@ ggsave(sprintf(file.path(output_figdir,"%s.pdf"), plt_name), plts[[plt_name]], u
 
 plt_name = "dge-volcano-fc_vs_padj-oe"
 ggsave(sprintf(file.path(output_figdir,"%s.pdf"), plt_name), plts[[plt_name]], units = 'cm', width = 12, height = 12)
+
+# figdata
+filename = file.path(RESULTS_DIR,"files","figdata-oncogenes_oe-genexpr_TTLL11.xlsx")
+genexpr_oi %>% 
+    filter(treatment!="Hydroxyurea" & cell_line_simple!="RPE1TP53mut") %>%
+    write_xlsx(filename)
+
 
 print("Done!")

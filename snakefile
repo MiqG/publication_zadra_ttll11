@@ -111,7 +111,10 @@ rule all:
         expand(os.path.join(RESULTS_DIR,"files","dge_overexpression-GSE185512-{comparison}-merged.tsv"), comparison=COMPARISONS)
         ## visualize
         
-
+        # methylation of TTLL11's promoter
+        os.path.join(RESULTS_DIR,"figures","methylation_tcga")
+        
+        
 ##### 0. Download data #####
 rule download_gtex:
     params:
@@ -457,7 +460,44 @@ rule mutation_frequency:
         Rscript scripts/figures_mutation_frequencies.R
         """
 
-##### 6. Differential expresison in cell lines over expressing TTLL11 #####
+##### 6. Co-expression of TTLLs in healthy and tumor tissues ######
+rule coexpression_tcga:
+    input:
+        phenotype_file = os.path.join(PREP_DIR,'sample_phenotype.tsv')
+        genexpr_file = os.path.join(PREP_DIR,'genexpr_TCGA.tsv.gz')
+        ontology_chea_file = os.path.join(RAW_DIR,"Harmonizome","CHEA-TranscriptionFactorTargets.gmt.gz")
+    output:
+        directory(os.path.join(RESULTS_DIR,"figures","coexpression_tcga"))
+    shell:
+        """
+        Rscript scripts/figures_coexpression_tcga.R
+        """
+        
+
+##### 7. Differential expresison in cell lines over expressing oncogenes #####
+rule differential_genexpr_TTLL11_with_oncogene_oe:
+    input:
+        metadata_file = os.path.join(RAW_DIR,"GSE185512","metadata.tsv"),
+        counts_file = os.path.join(RAW_DIR,"GSE185512","genexpr_counts.tsv.gz")
+    output:
+        directory(os.path.join(RESULTS_DIR,"figures","differential_gene_expression-GSE185512"))
+    shell:
+        """
+        Rscript scripts/figures_GSE185512.R
+        """
+
+rule differential_genexpr_TTLLs_by_oncogene_status:
+    input:
+        genexpr_ttlls_file = os.path.join(PREP_DIR,'genexpr_TTLLs.tsv'),
+        genexpr_file = os.path.join(PREP_DIR,'genexpr_TCGA.tsv.gz'),
+        phenotype_file = os.path.join(PREP_DIR,'sample_phenotype.tsv')
+    output:
+        directory(os.path.join(RESULTS_DIR,"figures","differential_genexpr_by_oncogene_status"))
+    shell:
+        """
+        Rscript scripts/figures_differential_genexpr_TTLLs_by_oncogene_status.R
+        """
+    
 rule run_dge_overexpression_dox_vs_ctl:
     input:
         metadata = os.path.join(RAW_DIR,"GSE185512","metadata.tsv"),
@@ -562,15 +602,28 @@ rule run_dge_rpe1mutation:
         
         """
         
-##### 7. Methylation in TCGA #####
-# rule figures_methylation_tcga:
-#     input:
-#         phenotype = os.path.join(),
-#         methylation = os.path.join(),
-#         genexpr = os.path.join()
-#     output:
+##### 8. Methylation in TCGA #####
+rule figures_methylation_tcga:
+    input:
+        phenotype = os.path.join(PREP_DIR,'sample_phenotype.tsv'),
+        methylation = os.path.join(PREP_DIR,"methylation_TCGA-tss-by_gene",'merged.tsv.gz'),
+        genexpr = os.path.join(PREP_DIR,'genexpr_TTLLs.tsv')
+    output:
+        directory(os.path.join(RESULTS_DIR,"figures","methylation_tcga"))
+    shell:
+        """
+        Rscript scripts/figures_methylation_tcga.R
+        """
         
-#     shell:
-#         """
-#         Rscript scripts/figures_methylation_tcga.R
-#         """
+        
+##### 9. Differential expression of TTLL11 and TTLL13 #####
+rule diffgenexpr_ttll11_vs_ttll13:
+    input:
+        phenotype_file = os.path.join(PREP_DIR,'sample_phenotype.tsv'),
+        genexpr_file = os.path.join(PREP_DIR,'genexpr_TCGA.tsv.gz')
+    output:
+        directory(os.path.join(RESULTS_DIR,"figures","TTLL11_vs_TTLL13"))
+    shell:
+        """
+        Rscript scripts/figures_TTLL11_vs_TTLL13.R
+        """

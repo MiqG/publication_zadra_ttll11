@@ -31,6 +31,7 @@ GTEX_DIR = os.path.join(RAW_DIR,'GTEx','v8')
 XENA_DIR = os.path.join(RAW_DIR,'UCSCXena')
 ARTICLES_DIR = os.path.join(RAW_DIR,'articles')
 RESULTS_DIR = os.path.join(ROOT,'results')
+GENCODE_DIR = os.path.join(DATA_DIR,'GENCODE')
 
 CANCERS_OI = [
     'LUSC',
@@ -68,6 +69,10 @@ CELL_LINES = [
 
 COMPARISONS = ["dox_vs_ctl","dox_120h_vs_48h"]
 
+GENCODE_VERSIONS = {
+    "hg19": "v19"
+}
+
 ##### RULES ######
 rule all:
     input:
@@ -77,6 +82,7 @@ rule all:
         '.done/Taylor2018.done', # TCGA aneuploidy
         '.done/GSE185512.done',
         '.done/CHEA_TFs.done',
+        '.done/gencode_gtfs.done',
         
         # preprocess data
         '.done/prep-sample_phenotype.done',
@@ -84,6 +90,8 @@ rule all:
         '.done/prep-snv.done',
         '.done/prep-genexpr_TTLLs.done',
         '.done/prep-gtex.done',
+        # gene TSS coordinates
+        expand(os.path.join(GENCODE_DIR,"gene_tss-{version}-wup{window_up}_wdown{window_down}.tsv.gz"), version=GENCODE_VERSIONS.keys(), window_up=[1500], window_down=0),
         os.path.join(PREP_DIR,'methylation_probes_tss_mapping.tsv'),
         os.path.join(PREP_DIR,'methylation_probes_tss_list.txt'),
         os.path.join(PREP_DIR,"methylation_TCGA-tss.tsv.gz"),
@@ -108,7 +116,7 @@ rule all:
         expand(os.path.join(RESULTS_DIR,"files","dge_overexpression-GSE185512-{cell_line}-dox_120h_vs_48h.tsv"), cell_line=CELL_LINES),
         os.path.join(RESULTS_DIR,"files","dge_p53mutation-GSE185512-rpe1_120h_mut_vs_wt.tsv"),
         ## combine
-        expand(os.path.join(RESULTS_DIR,"files","dge_overexpression-GSE185512-{comparison}-merged.tsv"), comparison=COMPARISONS)
+        expand(os.path.join(RESULTS_DIR,"files","dge_overexpression-GSE185512-{comparison}-merged.tsv"), comparison=COMPARISONS),
         ## visualize
         
         # methylation of TTLL11's promoter
@@ -153,7 +161,6 @@ rule download_gtex:
         echo Done!
         """
         
-        
 rule download_ucscxena_tcga_pancan:
     params:
         # RNA-Seq
@@ -162,6 +169,9 @@ rule download_ucscxena_tcga_pancan:
         # Mutations
         snv = 'https://tcga-pancan-atlas-hub.s3.us-east-1.amazonaws.com/download/mc3.v0.2.8.PUBLIC.xena.gz',
         
+        # Methylation
+        methylation = 'https://tcga-pancan-atlas-hub.s3.us-east-1.amazonaws.com/latest/jhu-usc.edu_PANCAN_HumanMethylation450.betaValue_whitelisted.tsv.synapse_download_5096262.xena.gz',
+        methylation_annotation = 'https://tcga-pancan-atlas-hub.s3.us-east-1.amazonaws.com/latest/probeMap%2FilluminaMethyl450_hg19_GPL16304_TCGAlegacy',
         
         # Phenotype
         clinical = 'https://tcga-pancan-atlas-hub.s3.us-east-1.amazonaws.com/download/Survival_SupplementalTable_S1_20171025_xena_sp',
@@ -175,7 +185,11 @@ rule download_ucscxena_tcga_pancan:
         
         # Mutations
         snv = os.path.join(XENA_DIR,'TCGA','snv','mc3.v0.2.8.PUBLIC.xena.gz'),
-        
+
+        # Methylation
+        methylation = os.path.join(XENA_DIR,'TCGA','methylation','jhu-usc.edu_PANCAN_HumanMethylation450.betaValue_whitelisted.tsv.synapse_download_5096262.xena.gz'),
+        methylation_annotation = os.path.join(XENA_DIR,'TCGA','methylation','probeMap_illuminaMethyl450_hg19_GPL16304_TCGAlegacy'),
+
         # phenotype
         clinical = os.path.join(XENA_DIR,'TCGA','phenotype','Survival_SupplementalTable_S1_20171025_xena_sp.gz'),
         sample_type = os.path.join(XENA_DIR,'TCGA','phenotype','TCGA_phenotype_denseDataOnlyDownload.tsv.gz'),
@@ -199,7 +213,7 @@ rule download_ucscxena_tcga_pancan:
         
         echo Done!
         """
-
+        
 rule download_tcga_aneuploidy_scores:
     message:
         "Aneuploidy scores from Taylor *et al.* 2018 (https://doi.org/10.1016/j.ccell.2018.03.007)."
@@ -220,7 +234,6 @@ rule download_tcga_aneuploidy_scores:
         echo Done!
         """ 
         
-        
 rule download_GSE185512:
     output:
         touch('.done/GSE185512.done'),
@@ -230,7 +243,6 @@ rule download_GSE185512:
         """
         Rscript scripts/download_GSE185512.R
         """
-        
         
 rule download_harmonizome_gene_sets:
     params:
@@ -249,6 +261,24 @@ rule download_harmonizome_gene_sets:
         echo Done!
         """ 
         
+rule download_gencode_gtfs:
+    params:
+        hg19 = "https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_19/gencode.v19.annotation.gtf.gz"
+    output:
+        touch('.done/gencode_gtfs.done'),
+        hg19 = os.path.join(GENCODE_DIR,'gencode.v19.annotation.gtf'),
+        readme = os.path.join(GENCODE_DIR,'README.md')
+    shell:
+        """
+        # download
+        wget --user-agent="Chrome" --no-check-certificate {params.hg19} -O {output.hg19}
+        
+        gunzip -f {output.hg19}
+        
+        # add readme
+        echo "Downloaded on $(date)." > {output.readme}
+        echo Done!
+        """
         
 ##### 1. Preprocess data #####
 rule prep_sample_phenotype:
@@ -274,7 +304,6 @@ rule prep_aneuploidy:
         Rscript scripts/prep_aneuploidy_scores.R
         """
         
-        
 rule prep_snv:
     input:
         snv = os.path.join(XENA_DIR,'TCGA','snv','mc3.v0.2.8.PUBLIC.xena.gz'),
@@ -286,7 +315,6 @@ rule prep_snv:
         """
         Rscript scripts/prep_snv_counts.R
         """
-
         
 rule prep_genexpr_TTLLs:
     input:
@@ -311,7 +339,37 @@ rule prep_gtex:
         zgrep -e "GTEX\|TTLL11\|TTLL13" {input} | gzip > {output.gene_tpms}
         """
         
-
+rule get_gene_tss:
+    input:
+        annotation = lambda wildcards: os.path.join(GENCODE_DIR,"gencode.{version}.annotation.gtf").format(version=GENCODE_VERSIONS[wildcards.version])
+    params:
+        version = "{version}",
+        window_up = "{window_up}",
+        window_down = "{window_down}",
+        script_dir = os.path.join(os.path.dirname(ROOT),'repositories','GTFtools_0.8.5')
+    output:
+        tss = os.path.join(GENCODE_DIR,"gene_tss-{version}-wup{window_up}_wdown{window_down}.tsv.gz")
+    shell:
+        """
+        # get gene tss
+        python {params.script_dir}/gtftools.py \
+                    --TSS=tmp_{params.version}_{params.window_up}_{params.window_down} \
+                    --window='{params.window_up}-{params.window_down}' \
+                    {input.annotation}
+        
+        # add header
+        sed -i '1ichr\tstart\tend\tstrand\tensembl_transcript\tensembl_gene\tsymbol' tmp_{params.version}_{params.window_up}_{params.window_down}
+        
+        # compress
+        cat tmp_{params.version}_{params.window_up}_{params.window_down} | gzip > {output.tss}
+        
+        # cleanup
+        rm {input.annotation}.ensembl
+        rm tmp_{params.version}_{params.window_up}_{params.window_down}
+        
+        echo "Done!"
+        """
+        
 rule prep_methylation_tss:
     input:
         tss = os.path.join(RAW_DIR,'GENCODE','gene_tss-hg19-wup1500_wdown0.tsv.gz'),
@@ -395,7 +453,6 @@ rule tcga_combine_methylation:
         dfs.reset_index().to_csv(output.methylation, sep="\t", compression="gzip", index=None)
         
         print("Done!")
-            
     
 ##### 2. Gene expression of TTLL11 and TTLL13 across human tissues #####
 rule gtex_genexpr:
@@ -447,7 +504,7 @@ rule figures_gene_aneuploidy_correlation:
         """
         Rscript scripts/figures_aneuploidy_correlation.R
         """
-
+        
 ##### 5. Mutation frequency per kilobase of every gene in primary tumors #####
 rule mutation_frequency:
     input:
@@ -463,8 +520,8 @@ rule mutation_frequency:
 ##### 6. Co-expression of TTLLs in healthy and tumor tissues ######
 rule coexpression_tcga:
     input:
-        phenotype_file = os.path.join(PREP_DIR,'sample_phenotype.tsv')
-        genexpr_file = os.path.join(PREP_DIR,'genexpr_TCGA.tsv.gz')
+        phenotype_file = os.path.join(PREP_DIR,'sample_phenotype.tsv'),
+        genexpr_file = os.path.join(PREP_DIR,'genexpr_TCGA.tsv.gz'),
         ontology_chea_file = os.path.join(RAW_DIR,"Harmonizome","CHEA-TranscriptionFactorTargets.gmt.gz")
     output:
         directory(os.path.join(RESULTS_DIR,"figures","coexpression_tcga"))
@@ -472,7 +529,6 @@ rule coexpression_tcga:
         """
         Rscript scripts/figures_coexpression_tcga.R
         """
-        
 
 ##### 7. Differential expresison in cell lines over expressing oncogenes #####
 rule differential_genexpr_TTLL11_with_oncogene_oe:
@@ -497,111 +553,7 @@ rule differential_genexpr_TTLLs_by_oncogene_status:
         """
         Rscript scripts/figures_differential_genexpr_TTLLs_by_oncogene_status.R
         """
-    
-rule run_dge_overexpression_dox_vs_ctl:
-    input:
-        metadata = os.path.join(RAW_DIR,"GSE185512","metadata.tsv"),
-        counts = os.path.join(RAW_DIR,"GSE185512","genexpr_counts.tsv.gz")
-    output:
-        os.path.join(RESULTS_DIR,"files","dge_overexpression-GSE185512-{cell_line}-dox_vs_ctl.tsv")
-    params:
-        sample_col = "sampleID",
-        subset_cols = "cell_line|treatment",
-        subset_values = "{cell_line}|NO Dox;Doxycycline",
-        design = "~ timepoint + treatment",
-        comparison_col = "treatment",
-        condition_a = "Doxycycline",
-        condition_b = "NO Dox"
-    shell:
-        """
-        nice Rscript scripts/run_DESeq.R \
-                    --metadata_file={input.metadata} \
-                    --counts_file={input.counts} \
-                    --output_file='{output}' \
-                    --sample_col='{params.sample_col}' \
-                    --subset_cols='{params.subset_cols}' \
-                    --subset_values='{params.subset_values}' \
-                    --design='{params.design}' \
-                    --comparison_col='{params.comparison_col}' \
-                    --condition_a='{params.condition_a}' \
-                    --condition_b='{params.condition_b}'
-        """
-        
-        
-rule run_dge_overexpression_dox_120h_vs_48h:
-    input:
-        metadata = os.path.join(RAW_DIR,"GSE185512","metadata.tsv"),
-        counts = os.path.join(RAW_DIR,"GSE185512","genexpr_counts.tsv.gz")
-    output:
-        os.path.join(RESULTS_DIR,"files","dge_overexpression-GSE185512-{cell_line}-dox_120h_vs_48h.tsv")
-    params:
-        sample_col = "sampleID",
-        subset_cols = "cell_line|treatment",
-        subset_values = "{cell_line}|Doxycycline",
-        design = "~ timepoint",
-        comparison_col = "timepoint",
-        condition_a = "120h",
-        condition_b = "48h"
-    shell:
-        """
-        nice Rscript scripts/run_DESeq.R \
-                    --metadata_file={input.metadata} \
-                    --counts_file={input.counts} \
-                    --output_file='{output}' \
-                    --sample_col='{params.sample_col}' \
-                    --subset_cols='{params.subset_cols}' \
-                    --subset_values='{params.subset_values}' \
-                    --design='{params.design}' \
-                    --comparison_col='{params.comparison_col}' \
-                    --condition_a='{params.condition_a}' \
-                    --condition_b='{params.condition_b}'
-        """
-        
-        
-rule combine_dge:
-    input:
-        dges = [os.path.join(RESULTS_DIR,"files","dge_overexpression-GSE185512-{cell_line}-{comparison}.tsv").format(cell_line=cell_line, comparison="{comparison}") for cell_line in CELL_LINES]
-    output:
-        dges = os.path.join(RESULTS_DIR,"files","dge_overexpression-GSE185512-{comparison}-merged.tsv")
-    run:
-        import pandas as pd
-        
-        merged = pd.concat([pd.read_table(f) for f in input.dges])
-        merged.to_csv(output.dges, sep="\t", index=None)
-        
-        print("Done!")
-        
-        
-rule run_dge_rpe1mutation:
-    input:
-        metadata = os.path.join(RAW_DIR,"GSE185512","metadata.tsv"),
-        counts = os.path.join(RAW_DIR,"GSE185512","genexpr_counts.tsv.gz")
-    output:
-        os.path.join(RESULTS_DIR,"files","dge_p53mutation-GSE185512-rpe1_120h_mut_vs_wt.tsv")
-    params:
-        sample_col = "sampleID",
-        subset_cols = "cell_line|treatment|timepoint",
-        subset_values = "RPE-1-Empty;RPE-1 mutTP53-Empty|NO Dox;Doxycycline|120h",
-        design = "~ treatment + cell_line",
-        comparison_col = "cell_line",
-        condition_a = "RPE-1 mutTP53-Empty",
-        condition_b = "RPE-1-Empty"
-    shell:
-        """
-        nice Rscript scripts/run_DESeq.R \
-                    --metadata_file={input.metadata} \
-                    --counts_file={input.counts} \
-                    --output_file='{output}' \
-                    --sample_col='{params.sample_col}' \
-                    --subset_cols='{params.subset_cols}' \
-                    --subset_values='{params.subset_values}' \
-                    --design='{params.design}' \
-                    --comparison_col='{params.comparison_col}' \
-                    --condition_a='{params.condition_a}' \
-                    --condition_b='{params.condition_b}'
-        
-        """
-        
+          
 ##### 8. Methylation in TCGA #####
 rule figures_methylation_tcga:
     input:
@@ -614,7 +566,6 @@ rule figures_methylation_tcga:
         """
         Rscript scripts/figures_methylation_tcga.R
         """
-        
         
 ##### 9. Differential expression of TTLL11 and TTLL13 #####
 rule diffgenexpr_ttll11_vs_ttll13:

@@ -31,9 +31,6 @@ FONT_FAMILY = 'Arial'
 # inputs
 metadata_file = file.path(RAW_DIR,"GSE185512","metadata.tsv")
 counts_file = file.path(RAW_DIR,"GSE185512","genexpr_counts.tsv.gz")
-dge_oe_file = file.path(RESULTS_DIR,"files","dge_overexpression-GSE185512-dox_vs_ctl-merged.tsv")
-dge_t_file = file.path(RESULTS_DIR,"files","dge_overexpression-GSE185512-dox_120h_vs_48h-merged.tsv")
-dge_mut_file = file.path(RESULTS_DIR,"files","dge_p53mutation-GSE185512-rpe1_120h_mut_vs_wt.tsv")
 
 # outputs
 output_figdir = file.path(RESULTS_DIR,"figures","differential_gene_expression-GSE185512")
@@ -45,9 +42,6 @@ plts = list()
 metadata = read_tsv(metadata_file)
 counts = read_tsv(counts_file)
 gene_lengths = read_tsv("~/databases/data/GENCODE/gene_length.tsv")
-dge_oe = read_tsv(dge_oe_file)
-dge_t = read_tsv(dge_t_file)
-dge_mut = read_tsv(dge_mut_file)
 
 # prepare
 metadata = metadata %>% mutate(cell_line=gsub("RPE-1","RPE1",cell_line),                               

@@ -1,6 +1,6 @@
 # Chromosome segregation fidelity requires microtubule polyglutamylation by the cancer downregulated enzyme TTLL11
 
-This repository contains all the scripts to perform the bioinformatic data analyses in Zadra *et al.*, XXXX (DOI: XXXX).
+This repository contains all the scripts to perform the bioinformatic data analyses in Zadra *et al.*, 2022 (DOI:  https://doi.org/10.1038/s41467-022-34909-y).
 
 ## Overview
 The scripts carry out the following steps from data download to publishable figures:
